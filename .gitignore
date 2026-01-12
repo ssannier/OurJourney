@@ -1,0 +1,8 @@
+our-journey/*.swp
+our-journey/package-lock.json
+our-journey/__pycache__/
+our-journey/.pytest_cache/
+our-journey/.venv/
+our-journey/*.egg-info/
+our-journey/.cdk.staging/
+our-journey/cdk.out/
