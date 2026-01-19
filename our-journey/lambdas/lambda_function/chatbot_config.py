@@ -2,6 +2,7 @@ import logging
 from prompts import prompt
 import constants  # This configures logging
 import random
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ temperature = 0.3
 # ============================================================================
 
 # This function retrieves the appropriate prompt based on the type of interaction.
-def get_prompt(results=None):
+def get_prompt(results=None, userInfo=None):
     """
     Returns the appropriate prompt based on the specified type.
     Formats prompts with provided parameters for AI model consumption.
@@ -36,7 +37,7 @@ def get_prompt(results=None):
     try:
         return [
             {
-                "text": prompt.prompt.format(results=results) 
+                "text": prompt.prompt.format(results=results, userInfo=json.dumps(userInfo)), 
             }
         ]
         

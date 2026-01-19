@@ -5,6 +5,7 @@ import logging
 import traceback
 import constants  # This configures logging
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -345,7 +346,7 @@ def create_history(chatHistory):
         raise
 
 
-# Function to execute a knowledge base query using Bedrock Agent Runtime #TODO Fix to work with regular KB
+# Function to execute a knowledge base query using Bedrock Agent Runtime
 def execute_knowledge_base_query(question):
     try:
         # Set up the knowledge base ID and retrieval configuration
@@ -354,25 +355,28 @@ def execute_knowledge_base_query(question):
             'text': question
         }
         
+        retrieval_configuration = {
+            'vectorSearchConfiguration': {
+                'numberOfResults': int(constants.NUM_KB_RESULTS),
+            }
+        }
+        
         # Retrieve from the Knowledge base
         logger.info(f"Retrieving from knowledge base with query: {query['text']}")
-        try:
-            kb_results = agent.retrieve(knowledgeBaseId=knowledge_base_id, retrievalQuery=query)
-        except Exception as e:
-            logger.error(f"Knowledge base retrieval failed: {e}")
-            kb_results = {'retrievalResults': [{"content": {"row": "An error occurred while retrieving from the knowledge base. Please have the user try again."}, "location": {"sqlLocation": {"query": "No query executed"}}}]}
+        kb_results = agent.retrieve(
+            knowledgeBaseId=knowledge_base_id, 
+            retrievalQuery=query, 
+            retrievalConfiguration=retrieval_configuration
+        )
         
-        # Get the results from the knowledge base
-        results = str(kb_results['retrievalResults'][0]['content']['row'])
-        query_value = kb_results['retrievalResults'][0]['location']['sqlLocation']['query']
-
-        logger.info("Knowledge base retrieval query:", query_value)
-        
-        return results
+        logger.info("Knowledge base retrieval successful")
+        return kb_results
         
     except Exception as e:
         logger.error(f"Knowledge base retrieval failed: {e}")
         raise
+
+
 
 
 def format_results_for_response(question, result):

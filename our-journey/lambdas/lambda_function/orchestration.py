@@ -31,12 +31,13 @@ def orchestrate(event):
     
     
     try:
-        # Parse chat history
+        # Parse chat history & UserInfo
         chatHistory = json.loads(event["body"])["messages"]
+        userInfo = json.loads(event["body"])["userInfo"]
 
         logger.info(f"Parsed {len(chatHistory)} messages")
 
-        response = respond_to_query(chatHistory=chatHistory)
+        response = respond_to_query(chatHistory=chatHistory, userInfo=userInfo)
         parse_and_send_response(response, connectionId)
         logger.info("Answer processed successfully")
               
@@ -52,25 +53,23 @@ def orchestrate(event):
     return None
 
 
-# Respond to SQL queries by orchestrating a multi-stage pipeline.
-def respond_to_query(chatHistory):
+# Respond to the user's query by orchestrating multiple stages.
+def respond_to_query(chatHistory, userInfo):
     """
-    Handle SQL queries through multi-stage pipeline:
-    1. Create specific question from user input
-    2. Retrieve answers from the database
-    3. Generate final response based on query results.
-    This orchestrates the entire SQL query process, ensuring robust error handling.
+    Orchestrate the multi-stage pipeline to respond to  queries.
     """
     logger.info("Starting SQL query pipeline")
     
     try:
 
-        specific_question = chatHistory[-1]['text'] # Assume last message is the user question
+        
+        specific_question = chatHistory[-1]['content'][-1].get('text', '') if chatHistory[-1].get('content') else ''
 
         # Stage 1: get answers from the database
         logger.info("Retrieving answers from the database")
         results = retrieve_answers_from_database(
             question=specific_question, 
+            userInfo=userInfo
         )
 
         # Check if results are empty
@@ -88,6 +87,7 @@ def respond_to_query(chatHistory):
         final_response = get_final_response(
             chatHistory=chatHistory, 
             results=results,
+            userInfo=userInfo
         )
         
         logger.info("pipeline completed")
@@ -100,7 +100,7 @@ def respond_to_query(chatHistory):
 
 
 # Retrieve final response based on query results.
-def get_final_response(chatHistory, results):
+def get_final_response(chatHistory, results, userInfo):
     """
     Convert  query results into natural language response.
     Synthesizes data into conversational format that answers the user's question.
@@ -113,7 +113,7 @@ def get_final_response(chatHistory, results):
             get_id(),
             chatHistory,
             config=get_config(),
-            system=get_prompt(results=results),
+            system=get_prompt(results=results, userInfo=userInfo),
             streaming=True
         )
         
@@ -126,15 +126,19 @@ def get_final_response(chatHistory, results):
 
 
 # Retrieve answers from the database based on the specific question.
-def retrieve_answers_from_database(question):
+def retrieve_answers_from_database(question, userInfo):
     """
     Retrieve answers from the database based on the specific question.
     This function executes the SQL queries and returns the results. - All inside bedrock knowledge bases
     """
     logger.info("Retrieving answers from the database")
+
+    # Combine the userInfo and the specific question to form the query
+    query = question
+
     try:
         # Send question to the knowledge base
-        results = execute_knowledge_base_query(question)
+        results = execute_knowledge_base_query(query)
         logger.info("Database query executed successfully")
         return results
     except Exception as e:

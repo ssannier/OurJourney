@@ -20,13 +20,6 @@ class OurJourneyStack(Stack):
         # Create an S3 bucket to store documents
         docBucket = s3.Bucket(self, 'DocBucket')
 
-        # Deploy local files to the S3 bucket
-        s3deploy.BucketDeployment(
-            self, 'DeployDocs',
-            sources=[s3deploy.Source.asset('../our-journey/S3')],  # Path relative to our_journey folder
-            destination_bucket=docBucket,
-        )
-
         # Create a Bedrock Vector Knowledge Base
         kb = bedrock.VectorKnowledgeBase(self, "knowledgebase",
                                      embeddings_model=bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_256,
@@ -46,7 +39,7 @@ class OurJourneyStack(Stack):
             self, 
             "stage",
             web_socket_api=web_socket_api,
-            stage_name="dev",
+            stage_name="prod",
             auto_deploy=True
         )
 
@@ -62,7 +55,8 @@ class OurJourneyStack(Stack):
             timeout = Duration.minutes(15),
             environment={
                 "API_GATEWAY_URL": web_socket_api.api_endpoint,
-                "KNOWLEDGE_BASE_ID": kb.knowledge_base_id, 
+                "KNOWLEDGE_BASE_ID": kb.knowledge_base_id,
+                "NUM_KB_RESULTS": "5",
             }
         )
 
@@ -72,6 +66,12 @@ class OurJourneyStack(Stack):
         )
         bedrock_orchestration.role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonAPIGatewayInvokeFullAccess")
+        )
+        bedrock_orchestration.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[f"arn:aws:lambda:{self.region}:{self.account}:function:OurJourneyStack-*"]
+            )
         )
 
         

@@ -33,3 +33,7 @@ if not API_GATEWAY_URL:
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
 if not KNOWLEDGE_BASE_ID:
     raise ValueError("KNOWLEDGE_BASE_ID environment variable is required")
+
+NUM_KB_RESULTS = os.environ.get("NUM_KB_RESULTS")
+if not NUM_KB_RESULTS:
+    raise ValueError("NUM_KB_RESULTS environment variable is required")
