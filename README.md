@@ -6,12 +6,12 @@ A React-based frontend application for Our Journey's chatbot system, designed to
 
 - [Features](#features)
 - [Architecture Overview](#architecture-overview)
-- [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [Backend Integration](#backend-integration)
 - [Deployment](#deployment)
-- [Environment Variables](#environment-variables)
-- [API Documentation](#api-documentation)
+- [Supported Languages](#supported-languages)
+- [Features in Detail](#features-in-detail)
+- [User Guide](#user-guide)
 
 ## Features
 
@@ -156,6 +156,39 @@ await webSocketManager.sendMessageAndWaitForResponse(
   userInfo
 );
 ```
+
+## Deployment
+
+### Prerequisites
+
+Ensure you have access to the Nova Pro LLM model and Titan text embedding models in your AWS account, and permissions to deploy resources.
+
+### Deployment Steps
+
+1. Go to the AWS account you want the system to be deployed in and in the top right create a new CloudShell terminal
+
+2. Clone the repository:
+   ```bash
+   git clone https://github.com/ASUCICREPO/OurJourney
+   ```
+
+3. Navigate to the project directory:
+   ```bash
+   cd OurJourney
+   ```
+
+4. Make the setup script executable:
+   ```bash
+   chmod +x setup.sh
+   ```
+
+5. Run the deployment script:
+   ```bash
+   ./setup.sh
+   ```
+
+6. Wait for the system to be deployed (may take up to 30 minutes)
+
 
 
 ## Supported Languages
