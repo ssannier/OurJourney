@@ -64,6 +64,99 @@ print_warning() {
     echo -e "${YELLOW}[⚠]${NC} $1" >&2
 }
 
+prompt_admin_credentials() {
+    """
+    Prompt user for admin email and password with validation.
+    Sets ADMIN_EMAIL and ADMIN_PASSWORD global variables.
+    """
+    print_header "Admin Credentials Setup"
+    
+    echo -e "${YELLOW}A default admin user will be created for your application.${NC}" >&2
+    echo -e "This user will have access to the admin dashboard at /admin." >&2
+    echo "" >&2
+    
+    # Prompt for admin email
+    while true; do
+        echo -n "Enter admin email address [default: admin@ourjourney.local]: " >&2
+        read -r ADMIN_EMAIL
+        
+        # Use default if empty
+        if [ -z "$ADMIN_EMAIL" ]; then
+            ADMIN_EMAIL="admin@ourjourney.local"
+        fi
+        
+        # Validate email format (basic validation)
+        if [[ "$ADMIN_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            break
+        else
+            print_error "Invalid email format. Please try again."
+        fi
+    done
+    
+    print_substep "Admin email: $ADMIN_EMAIL"
+    echo "" >&2
+    
+    # Prompt for admin password
+    echo -e "Password requirements:" >&2
+    echo -e "  • Minimum 8 characters" >&2
+    echo -e "  • At least one uppercase letter" >&2
+    echo -e "  • At least one lowercase letter" >&2
+    echo -e "  • At least one number" >&2
+    echo "" >&2
+    
+    while true; do
+        echo -n "Enter admin password [default: AdminPassword123!]: " >&2
+        read -rs ADMIN_PASSWORD  # -s flag hides input
+        echo "" >&2
+        
+        # Use default if empty
+        if [ -z "$ADMIN_PASSWORD" ]; then
+            ADMIN_PASSWORD="AdminPassword123!"
+            print_warning "Using default password. Please change it after first login!"
+            break
+        fi
+        
+        # Validate password requirements
+        if [ ${#ADMIN_PASSWORD} -lt 8 ]; then
+            print_error "Password must be at least 8 characters"
+            continue
+        fi
+        
+        if ! [[ "$ADMIN_PASSWORD" =~ [A-Z] ]]; then
+            print_error "Password must contain at least one uppercase letter"
+            continue
+        fi
+        
+        if ! [[ "$ADMIN_PASSWORD" =~ [a-z] ]]; then
+            print_error "Password must contain at least one lowercase letter"
+            continue
+        fi
+        
+        if ! [[ "$ADMIN_PASSWORD" =~ [0-9] ]]; then
+            print_error "Password must contain at least one number"
+            continue
+        fi
+        
+        # Confirm password
+        echo -n "Confirm admin password: " >&2
+        read -rs ADMIN_PASSWORD_CONFIRM
+        echo "" >&2
+        
+        if [ "$ADMIN_PASSWORD" = "$ADMIN_PASSWORD_CONFIRM" ]; then
+            break
+        else
+            print_error "Passwords do not match. Please try again."
+        fi
+    done
+    
+    print_step "Admin credentials configured"
+    echo "" >&2
+    
+    # Export for use in deployment
+    export ADMIN_EMAIL
+    export ADMIN_PASSWORD
+}
+
 ################################################################################
 # Pre-flight Checks
 ################################################################################
@@ -357,17 +450,21 @@ deploy_frontend() {
     fi
     print_substep "build.zip found"
     
-    # Deploy the stack
-    print_substep "Deploying $FRONTEND_STACK_NAME to $AWS_REGION..."
+    # Deploy the stack with admin credentials
+    print_substep "Deploying $FRONTEND_STACK_NAME to $AWS_REGION with admin credentials..."
     
-    # Deploy with live output (removed output capturing)
-    if ! cdk deploy $FRONTEND_STACK_NAME --require-approval never --region $AWS_REGION; then
+    # Deploy with admin credentials passed via context
+    if ! cdk deploy $FRONTEND_STACK_NAME \
+        --require-approval never \
+        --region $AWS_REGION \
+        -c adminEmail="$ADMIN_EMAIL" \
+        -c adminPassword="$ADMIN_PASSWORD"; then
         print_error "Frontend stack deployment failed"
         cd "$OLDPWD" > /dev/null 2>&1 || cd - > /dev/null 2>&1 || true
         rollback_deployment 3
     fi
     
-    # Amplify URL will be available in the console after deployment completes
+    print_substep "Admin user created: $ADMIN_EMAIL"
     print_substep "View your Amplify app URL in the AWS Amplify console"
     
     print_step "Frontend stack deployed successfully"
@@ -469,6 +566,9 @@ main() {
             # Run pre-flight checks
             run_preflight_checks
             
+            # Prompt for admin credentials early
+            prompt_admin_credentials
+            
             # Stage 1: Deploy backend
             deploy_backend
             
@@ -505,10 +605,15 @@ main() {
             echo "  • Document Bucket: $DOC_BUCKET_NAME" >&2
             echo "  • Amplify Console: https://console.aws.amazon.com/amplify/home?region=$AWS_REGION" >&2
             echo "" >&2
+            echo "Admin Credentials:" >&2
+            echo "  • Email: $ADMIN_EMAIL" >&2
+            echo "  • Password: [hidden - you entered this during setup]" >&2
+            echo "" >&2
             echo "Next steps:" >&2
             echo "  1. Visit your Amplify app URL above to access the application" >&2
-            echo "  2. Check AWS Amplify console for deployment status" >&2
-            echo "  3. Test the WebSocket connection from your app" >&2
+            echo "  2. Sign in with the admin credentials" >&2
+            echo "  3. You will be redirected to the admin dashboard at /admin" >&2
+            echo "  4. Change your admin password after first login!" >&2
             echo "" >&2
             ;;
             

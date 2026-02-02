@@ -5,66 +5,6 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
-// Mock follow-up requests
-const mockFollowUps = [
-  {
-    id: 'fu-1',
-    userId: 'user-845',
-    county: 'Mecklenburg',
-    timestamp: '2025-12-28T14:14:00',
-    requestType: 'crisis',
-    email: 'user845@email.com',
-    phone: '(704) 555-0123',
-    preferredContact: 'phone',
-    conversationSummary: 'User expressed feelings of hopelessness. Provided crisis resources. User requested follow-up.',
-    status: 'new',
-    priority: 'urgent',
-    assignedTo: null
-  },
-  {
-    id: 'fu-2',
-    userId: 'user-843',
-    county: 'Forsyth',
-    timestamp: '2025-12-28T14:01:00',
-    requestType: 'general',
-    email: 'user843@email.com',
-    phone: '',
-    preferredContact: 'email',
-    conversationSummary: 'User seeking housing and healthcare resources. Wants personalized assistance.',
-    status: 'in-progress',
-    priority: 'normal',
-    assignedTo: 'Team Member A'
-  },
-  {
-    id: 'fu-3',
-    userId: 'user-840',
-    county: 'Wake',
-    timestamp: '2025-12-28T13:45:00',
-    requestType: 'general',
-    email: '',
-    phone: '(919) 555-0156',
-    preferredContact: 'phone',
-    conversationSummary: 'User needs help navigating job training programs. Wants callback to discuss options.',
-    status: 'new',
-    priority: 'normal',
-    assignedTo: null
-  },
-  {
-    id: 'fu-4',
-    userId: 'user-837',
-    county: 'Durham',
-    timestamp: '2025-12-28T12:30:00',
-    requestType: 'general',
-    email: 'user837@email.com',
-    phone: '(919) 555-0187',
-    preferredContact: 'email',
-    conversationSummary: 'Questions about expungement process. Shared legal resources but user wants legal consultation.',
-    status: 'completed',
-    priority: 'normal',
-    assignedTo: 'Team Member B'
-  }
-];
-
 const statusColors = {
   'new': 'bg-blue-100 text-blue-700',
   'in-progress': 'bg-amber-100 text-amber-700',
@@ -80,7 +20,9 @@ export const FollowUpQueue = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
 
-  const filteredItems = mockFollowUps.filter(item => {
+  const followUps: any[] = [];
+
+  const filteredItems = followUps.filter(item => {
     if (filterStatus === 'all') return true;
     return item.status === filterStatus;
   });
@@ -122,7 +64,7 @@ export const FollowUpQueue = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <p className="text-3xl font-bold text-blue-600">
-                {mockFollowUps.filter(f => f.status === 'new').length}
+                {followUps.filter(f => f.status === 'new').length}
               </p>
               <p className="text-sm text-gray-600 mt-1">New Requests</p>
             </div>
@@ -133,7 +75,7 @@ export const FollowUpQueue = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <p className="text-3xl font-bold text-amber-600">
-                {mockFollowUps.filter(f => f.status === 'in-progress').length}
+                {followUps.filter(f => f.status === 'in-progress').length}
               </p>
               <p className="text-sm text-gray-600 mt-1">In Progress</p>
             </div>
@@ -144,7 +86,7 @@ export const FollowUpQueue = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <p className="text-3xl font-bold text-green-600">
-                {mockFollowUps.filter(f => f.status === 'completed').length}
+                {followUps.filter(f => f.status === 'completed').length}
               </p>
               <p className="text-sm text-gray-600 mt-1">Completed</p>
             </div>
@@ -155,7 +97,7 @@ export const FollowUpQueue = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <p className="text-3xl font-bold text-red-600">
-                {mockFollowUps.filter(f => f.priority === 'urgent').length}
+                {followUps.filter(f => f.priority === 'urgent').length}
               </p>
               <p className="text-sm text-gray-600 mt-1">Urgent</p>
             </div>

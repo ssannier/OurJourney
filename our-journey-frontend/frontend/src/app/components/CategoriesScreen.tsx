@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Home, Briefcase, Scale, Heart, Bus, DollarSign, GraduationCap, Users, ClipboardList, Smartphone, AlertCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, Home, Briefcase, Scale, Heart, Bus, DollarSign, GraduationCap, Users, ClipboardList, Smartphone, AlertCircle, CreditCard, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { useApp } from '../context/AppContext';
 import { RESOURCE_CATEGORIES } from '../data/resources';
+import { signOut } from 'aws-amplify/auth';
 
 const iconMap: Record<string, any> = {
   'CreditCard': CreditCard,
@@ -31,6 +32,15 @@ export const CategoriesScreen = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login'); // Adjust to your login route
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       {/* Header */}
@@ -43,7 +53,7 @@ export const CategoriesScreen = () => {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h2 className="font-semibold text-[#212121]">
               {language === 'en' ? 'Browse Categories' : 'Explorar Categorías'}
             </h2>
@@ -51,6 +61,14 @@ export const CategoriesScreen = () => {
               {language === 'en' ? 'Find resources by topic' : 'Encuentra recursos por tema'}
             </p>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleSignOut}
+            title={language === 'en' ? 'Sign Out' : 'Cerrar Sesión'}
+          >
+            <LogOut className="w-5 h-5 text-gray-600" />
+          </Button>
         </div>
       </div>
 
@@ -62,11 +80,9 @@ export const CategoriesScreen = () => {
               ? 'Select a category to see available resources:'
               : 'Selecciona una categoría para ver los recursos disponibles:'}
           </p>
-          
           <div className="grid grid-cols-2 gap-3">
             {RESOURCE_CATEGORIES.map((category) => {
               const Icon = iconMap[category.icon];
-              
               return (
                 <button
                   key={category.id}

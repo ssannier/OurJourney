@@ -29,6 +29,8 @@ A React-based frontend application for Our Journey's chatbot system, designed to
 
 ### System Architecture
 
+![Architecture Diagram](diagram.png)
+
 The application uses a serverless architecture on AWS:
 
 - **Frontend**: React application hosted on AWS Amplify
@@ -187,9 +189,11 @@ Ensure you have access to the Nova Pro LLM model and Titan text embedding models
    ./setup.sh
    ```
 
-6. Wait for the system to be deployed (may take up to 30 minutes)
+6. Enter your prefered admin email and password
 
-7. View the application at the deployed amplify link, which can be found in the amplify console page
+7. Wait for the system to be deployed (may take up to 30 minutes)
+
+8. View the application at the deployed amplify link, which can be found in the amplify console page
 
 
 

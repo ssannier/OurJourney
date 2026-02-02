@@ -5,7 +5,6 @@ import os
 import zipfile
 import tempfile
 import logging
-import traceback
 from constants import (
     CFN_SUCCESS, CFN_FAILED, RESPONSE_MESSAGES, AMPLIFY_APP_NAME,
     FRONTEND_BUCKET_NAME, FRONTEND_FOLDER_NAME, AMPLIFY_APP_CONFIG,
@@ -30,11 +29,9 @@ def handle_create_request(event, context):
     Handle CloudFormation Create request for Amplify app deployment.
     
     Orchestrates the complete create workflow:
-    1. Create Amplify app and production branch (to get app URL)
-    2. Create cognito-config.json with Amplify URL
-    3. Inject cognito-config.json into build.zip
-    4. Extract and deploy updated build.zip to S3
-    5. Start Amplify deployment
+    1. Extract and deploy frontend files from S3
+    2. Create Amplify app and production branch
+    3. Start initial deployment
     
     Args:
         event: CloudFormation event data
@@ -46,7 +43,18 @@ def handle_create_request(event, context):
     logger.info("Starting Create request handling")
     
     try:
-        # Stage 1: Create Amplify app and branch (BEFORE extracting zip)
+        # Stage 1: Extract and deploy frontend files
+        logger.info("Extracting frontend files from S3")
+        extract_response = extract_and_deploy_s3_zip(FRONTEND_BUCKET_NAME, DEFAULT_ZIP_FILE)
+        if extract_response['success']:
+            logger.info(f"Successfully extracted {len(extract_response['uploaded_files'])} files")
+        else:
+            logger.error("Failed to extract S3 zip file")
+            send_cfn_response(event, context, CFN_SUCCESS, 
+                            {"Message": RESPONSE_MESSAGES["ZIP_EXTRACTION_ERROR"]})
+            return
+        
+        # Stage 2: Create Amplify app and branch
         logger.info("Creating Amplify app and branch")
         app_creation_response = create_amplify_app_and_branch()
         if not app_creation_response['success']:
@@ -59,38 +67,31 @@ def handle_create_request(event, context):
         branch_name = app_creation_response['branch_name']
         amplify_app_url = app_creation_response.get('app_url', '')
         
-        # Stage 2: Update Cognito callback URLs with actual Amplify domain
+        # Stage 2.5a: Save initial Cognito config to S3
+        logger.info("Saving Cognito configuration to S3")
+        cognito_config_response = save_cognito_config_to_s3()
+        if not cognito_config_response['success']:
+            logger.warning(f"Failed to save Cognito config: {cognito_config_response['message']}")
+            # Continue anyway - not critical for initial deployment
+        
+        # Stage 2.5b: Update Cognito callback URLs with actual Amplify domain
         if amplify_app_url:
             logger.info(f"Updating Cognito callback URLs with: {amplify_app_url}")
             callback_update_response = update_cognito_callback_urls(amplify_app_url)
             if callback_update_response['success']:
                 logger.info("Cognito callback URLs updated successfully")
+                # Stage 2.5c: Update cognito-config.json with actual URL
+                config_update_response = update_cognito_config_with_url(amplify_app_url)
+                if config_update_response['success']:
+                    logger.info("Cognito config file updated with Amplify URL")
+                else:
+                    logger.warning(f"Failed to update config file: {config_update_response['message']}")
             else:
                 logger.warning(f"Failed to update callback URLs: {callback_update_response['message']}")
         else:
             logger.warning("No Amplify app URL available, skipping Cognito callback URL update")
         
-        # Stage 3: Inject cognito-config.json into build.zip
-        logger.info("Injecting Cognito configuration into build.zip")
-        inject_response = inject_cognito_config_into_zip(FRONTEND_BUCKET_NAME, DEFAULT_ZIP_FILE, amplify_app_url)
-        if not inject_response['success']:
-            logger.error(f"Failed to inject Cognito config into build.zip: {inject_response['message']}")
-            send_cfn_response(event, context, CFN_SUCCESS, 
-                            {"Message": "Failed to prepare frontend build with authentication"})
-            return
-        
-        # Stage 4: Extract and deploy frontend files from updated build.zip
-        logger.info("Extracting frontend files from S3")
-        extract_response = extract_and_deploy_s3_zip(FRONTEND_BUCKET_NAME, DEFAULT_ZIP_FILE)
-        if extract_response['success']:
-            logger.info(f"Successfully extracted {len(extract_response['uploaded_files'])} files")
-        else:
-            logger.error("Failed to extract S3 zip file")
-            send_cfn_response(event, context, CFN_SUCCESS, 
-                            {"Message": RESPONSE_MESSAGES["ZIP_EXTRACTION_ERROR"]})
-            return
-        
-        # Stage 5: Save app ID to S3 for future reference
+        # Stage 2.6: Save app ID to S3 for future reference
         logger.info("Saving app ID to S3")
         save_response = save_app_id_to_s3(app_id)
         if not save_response['success']:
@@ -365,111 +366,12 @@ def save_app_id_to_s3(app_id):
         return {"success": False, "message": error_msg}
 
 
-def inject_cognito_config_into_zip(bucket_name, zip_key, amplify_app_url):
-    """
-    Download build.zip, inject cognito-config.json into it, and re-upload.
-    
-    This function:
-    1. Downloads build.zip from S3
-    2. Extracts it to a temporary directory
-    3. Creates cognito-config.json with the Amplify URL
-    4. Adds cognito-config.json to the root of the extracted files
-    5. Re-zips everything back up
-    6. Uploads the updated build.zip back to S3 (replacing the original)
-    
-    Args:
-        bucket_name (str): S3 bucket name containing build.zip
-        zip_key (str): S3 key of the zip file (usually "build.zip")
-        amplify_app_url (str): The Amplify app URL for OAuth redirects
-        
-    Returns:
-        dict: Response with success status and message
-    """
-    logger.info(f"Injecting Cognito config into {zip_key}")
-    
-    try:
-        # Create temporary directory for processing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Step 1: Download the zip file from S3
-            zip_file_path = os.path.join(temp_dir, 'original.zip')
-            logger.info(f"Downloading {zip_key} from bucket {bucket_name}")
-            s3_client.download_file(bucket_name, zip_key, zip_file_path)
-            
-            # Step 2: Extract the zip file
-            extract_dir = os.path.join(temp_dir, 'extracted')
-            os.makedirs(extract_dir, exist_ok=True)
-            
-            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-                file_count = len(zip_ref.namelist())
-                logger.info(f"Extracted {file_count} files from build.zip")
-            
-            # Step 3: Create cognito-config.json content
-            cognito_config = {
-                "region": COGNITO_REGION,
-                "userPoolId": USER_POOL_ID,
-                "userPoolClientId": USER_POOL_CLIENT_ID,
-                "hostedUIDomain": USER_POOL_DOMAIN,
-                "authenticationFlowType": COGNITO_AUTH_FLOW_TYPE,
-                "oauth": {
-                    "domain": USER_POOL_DOMAIN.replace("https://", "").replace("http://", ""),
-                    "scope": COGNITO_OAUTH_SCOPES,
-                    "redirectSignIn": amplify_app_url or "TO_BE_UPDATED",
-                    "redirectSignOut": amplify_app_url or "TO_BE_UPDATED",
-                    "responseType": "code"
-                },
-                "groups": {
-                    "users": "Users",
-                    "admins": "Admins"
-                },
-                "routes": {
-                    "user": "/",
-                    "admin": "/admin"
-                }
-            }
-            
-            # Step 4: Write cognito-config.json to the root of extracted files
-            config_file_path = os.path.join(extract_dir, 'cognito-config.json')
-            with open(config_file_path, 'w') as config_file:
-                json.dump(cognito_config, config_file, indent=2)
-            logger.info(f"Created cognito-config.json in extracted files")
-            
-            # Step 5: Re-zip everything back up
-            new_zip_path = os.path.join(temp_dir, 'updated.zip')
-            with zipfile.ZipFile(new_zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_out:
-                for root, dirs, files in os.walk(extract_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, extract_dir)
-                        zip_out.write(file_path, arcname)
-                        logger.debug(f"Added {arcname} to new zip")
-            
-            logger.info(f"Re-zipped {file_count + 1} files (including cognito-config.json)")
-            
-            # Step 6: Upload the updated zip back to S3, replacing the original
-            logger.info(f"Uploading updated build.zip to s3://{bucket_name}/{zip_key}")
-            s3_client.upload_file(new_zip_path, bucket_name, zip_key)
-            
-            logger.info("Successfully injected Cognito config into build.zip")
-            return {
-                "success": True,
-                "message": "Cognito configuration injected into build.zip successfully",
-                "files_in_zip": file_count + 1
-            }
-            
-    except Exception as e:
-        error_msg = f"Error injecting Cognito config into zip: {str(e)}"
-        logger.error(error_msg)
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return {"success": False, "message": error_msg}
-
-
 def save_cognito_config_to_s3():
     """
     Save Cognito configuration to S3 for frontend consumption.
     
-    Overwrites the placeholder cognito-config.json that was included
-    in the frontend build with actual Cognito values.
+    Creates a JSON file containing all Cognito settings that the
+    frontend needs to configure AWS Amplify authentication.
     Initial callback URLs are placeholders that will be updated
     after the Amplify app is created.
     
@@ -503,22 +405,15 @@ def save_cognito_config_to_s3():
             }
         }
         
-        # The cognito-config.json file already exists in the extracted build folder
-        # We overwrite it with the real values
-        # Path will be: /build/cognito-config.json (at root of extracted files)
-        config_key = f"{FRONTEND_FOLDER_NAME.strip('/')}/cognito-config.json"
-        
-        logger.info(f"Overwriting placeholder config at: s3://{FRONTEND_BUCKET_NAME}/{config_key}")
-        
         # Upload configuration to S3
         s3_client.put_object(
             Bucket=FRONTEND_BUCKET_NAME,
-            Key=config_key,
+            Key=COGNITO_CONFIG_FILE_KEY,
             Body=json.dumps(cognito_config, indent=2),
             ContentType='application/json'
         )
         
-        logger.info(f"Cognito config saved successfully")
+        logger.info(f"Cognito config saved to s3://{FRONTEND_BUCKET_NAME}/{COGNITO_CONFIG_FILE_KEY}")
         return {"success": True, "message": RESPONSE_MESSAGES["COGNITO_CONFIG_SAVE_SUCCESS"]}
         
     except Exception as e:

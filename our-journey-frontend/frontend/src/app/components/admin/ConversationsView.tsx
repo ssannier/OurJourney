@@ -2,73 +2,9 @@ import { useState } from 'react';
 import { Search, ListFilter, Eye, Flag, CircleCheck, MessageSquare } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-
-// Mock conversation data
-const mockConversations = [
-  {
-    id: 'conv-1247',
-    userId: 'user-847',
-    county: 'Wake',
-    timestamp: '2025-12-28T14:32:00',
-    messageCount: 12,
-    flag: 'none',
-    lastMessage: 'Thank you for the housing resources!',
-    categories: ['Housing', 'Jobs']
-  },
-  {
-    id: 'conv-1246',
-    userId: 'user-846',
-    county: 'Durham',
-    timestamp: '2025-12-28T14:20:00',
-    messageCount: 8,
-    flag: 'none',
-    lastMessage: 'Can you help me find job training programs?',
-    categories: ['Jobs']
-  },
-  {
-    id: 'conv-1245',
-    userId: 'user-845',
-    county: 'Mecklenburg',
-    timestamp: '2025-12-28T14:14:00',
-    messageCount: 5,
-    flag: 'crisis',
-    lastMessage: "I don't know what to do anymore...",
-    categories: ['Crisis']
-  },
-  {
-    id: 'conv-1244',
-    userId: 'user-844',
-    county: 'Guilford',
-    timestamp: '2025-12-28T14:07:00',
-    messageCount: 15,
-    flag: 'none',
-    lastMessage: 'Where can I get my ID replaced?',
-    categories: ['ID/Documents']
-  },
-  {
-    id: 'conv-1243',
-    userId: 'user-843',
-    county: 'Forsyth',
-    timestamp: '2025-12-28T14:01:00',
-    messageCount: 9,
-    flag: 'followup',
-    lastMessage: 'Yes, please have someone contact me',
-    categories: ['Housing', 'Healthcare']
-  },
-  {
-    id: 'conv-1242',
-    userId: 'user-842',
-    county: 'Cumberland',
-    timestamp: '2025-12-28T13:55:00',
-    messageCount: 6,
-    flag: 'resolved',
-    lastMessage: 'Perfect, that\'s exactly what I needed!',
-    categories: ['Legal']
-  }
-];
 
 const flagColors = {
   'none': 'bg-gray-100 text-gray-600',
@@ -89,7 +25,9 @@ export const ConversationsView = () => {
   const [filterFlag, setFilterFlag] = useState('all');
   const [selectedConv, setSelectedConv] = useState<string | null>(null);
 
-  const filteredConversations = mockConversations.filter(conv => {
+  const conversations: any[] = [];
+
+  const filteredConversations = conversations.filter(conv => {
     const matchesSearch = conv.userId.includes(searchTerm) || 
                           conv.county.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           conv.id.includes(searchTerm);
@@ -171,7 +109,7 @@ export const ConversationsView = () => {
               <p className="text-sm text-gray-700 italic mb-2">"{conv.lastMessage}"</p>
 
               <div className="flex items-center gap-2">
-                {conv.categories.map((cat) => (
+                {conv.categories.map((cat: string) => (
                   <span 
                     key={cat}
                     className="text-xs bg-[#E8F5E9] text-[#1B5E20] px-2 py-1 rounded"

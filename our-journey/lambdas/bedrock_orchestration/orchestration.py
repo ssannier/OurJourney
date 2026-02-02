@@ -125,17 +125,42 @@ def get_final_response(chatHistory, results, userInfo):
         raise
 
 
-# Retrieve answers from the database based on the specific question.
 def retrieve_answers_from_database(question, userInfo):
     """
     Retrieve answers from the database based on the specific question.
     This function executes the SQL queries and returns the results. - All inside bedrock knowledge bases
     """
     logger.info("Retrieving answers from the database")
-
-    # Combine the userInfo and the specific question to form the query
-    query = question
-
+    
+    # Convert userInfo to readable text, handling missing fields
+    user_context_parts = []
+    
+    if userInfo.get('county'):
+        user_context_parts.append(f"located in {userInfo['county']}")
+    
+    if userInfo.get('releaseDate'):
+        user_context_parts.append(f"release date is {userInfo['releaseDate']}")
+    
+    if userInfo.get('age18Plus') is not None:
+        age_status = "over 18" if userInfo['age18Plus'] else "under 18"
+        user_context_parts.append(age_status)
+    
+    if userInfo.get('gender'):
+        user_context_parts.append(f"gender is {userInfo['gender']}")
+    
+    if userInfo.get('email'):
+        user_context_parts.append(f"email is {userInfo['email']}")
+    
+    if userInfo.get('phone'):
+        user_context_parts.append(f"phone is {userInfo['phone']}")
+    
+    # Combine parts into a sentence, or use empty string if no user info
+    if user_context_parts:
+        user_context = f"User context: {', '.join(user_context_parts)}."
+        query = f"{user_context}\n\nQuestion: {question}"
+    else:
+        query = question
+    
     try:
         # Send question to the knowledge base
         results = execute_knowledge_base_query(query)

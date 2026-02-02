@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, HelpCircle, Users, ArrowLeft } from 'lucide-react';
+import { MessageSquare, Users, ArrowLeft } from 'lucide-react';
 import { Button } from '../ui/button';
 
 export const AdminDashboard = () => {
@@ -34,17 +34,6 @@ export const AdminDashboard = () => {
         <div className="max-w-7xl mx-auto">
           <nav className="flex gap-1 p-2">
             <Link
-              to="/admin"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                location.pathname === '/admin'
-                  ? 'bg-[#E8F5E9] text-[#1B5E20] font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Overview
-            </Link>
-            <Link
               to="/admin/conversations"
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 isActive('/admin/conversations')
@@ -54,17 +43,6 @@ export const AdminDashboard = () => {
             >
               <MessageSquare className="w-4 h-4" />
               Conversations
-            </Link>
-            <Link
-              to="/admin/faq"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                isActive('/admin/faq')
-                  ? 'bg-[#E8F5E9] text-[#1B5E20] font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <HelpCircle className="w-4 h-4" />
-              FAQ
             </Link>
             <Link
               to="/admin/followup"
