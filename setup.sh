@@ -30,6 +30,14 @@ FRONTEND_STACK_NAME="OurJourneyFrontendStack"
 BACKEND_DIR="./our-journey"
 FRONTEND_DIR="./our-journey-frontend"
 FRONTEND_BUILD_SCRIPT="./frontend_build.sh"
+BEDROCK_SCRIPT="./bedrock.sh"
+DOCUMENTS_SOURCE_DIR="./our-journey/S3"
+
+# Global variables set during deployment
+WEBSOCKET_URL=""
+KNOWLEDGE_BASE_ID=""
+DOC_BUCKET_NAME=""
+AMPLIFY_URL=""
 
 ################################################################################
 # Utility Functions
@@ -136,6 +144,20 @@ run_preflight_checks() {
     fi
     print_substep "frontend_build.sh exists"
     
+    # Check if bedrock script exists
+    if [ ! -f "$BEDROCK_SCRIPT" ]; then
+        print_error "Bedrock script not found: $BEDROCK_SCRIPT"
+        exit 1
+    fi
+    print_substep "bedrock.sh exists"
+    
+    # Check if documents source directory exists
+    if [ ! -d "$DOCUMENTS_SOURCE_DIR" ]; then
+        print_error "Documents source directory not found: $DOCUMENTS_SOURCE_DIR"
+        exit 1
+    fi
+    print_substep "Documents source directory exists"
+    
     print_step "All pre-flight checks passed"
     echo "" >&2
 }
@@ -164,17 +186,17 @@ rollback_deployment() {
     rm -rf "$FRONTEND_DIR/frontend/node_modules" 2>/dev/null || true
     
     # Destroy stacks based on which stage failed
-    if [ "$stage" -ge 3 ]; then
+    if [ "$stage" -ge 4 ]; then
         print_substep "Destroying frontend stack..."
         cd "$FRONTEND_DIR"
-        cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION 2>/dev/null || true
+        cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION >&2 2>&1 || true
         cd - > /dev/null
     fi
     
     if [ "$stage" -ge 2 ]; then
-        print_substep "Destroying backend stack..."
+        print_substep "Destroying backend stack (includes cleaning S3 buckets)..."
         cd "$BACKEND_DIR"
-        cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION 2>/dev/null || true
+        cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION >&2 2>&1 || true
         cd - > /dev/null
     fi
     
@@ -187,7 +209,7 @@ rollback_deployment() {
 ################################################################################
 
 deploy_backend() {
-    print_header "[Stage 1/3] Deploying Backend Stack"
+    print_header "[Stage 1/4] Deploying Backend Stack"
     
     cd "$BACKEND_DIR"
     
@@ -230,20 +252,49 @@ deploy_backend() {
     WEBSOCKET_URL="${WEBSOCKET_URL}/prod/"
     
     print_substep "Full WebSocket URL (with /prod/): $WEBSOCKET_URL"
+    
+    # Get Knowledge Base ID from stack outputs
+    print_substep "Retrieving Knowledge Base ID from stack outputs..."
+    KNOWLEDGE_BASE_ID=$(aws cloudformation describe-stacks \
+        --stack-name $BACKEND_STACK_NAME \
+        --region $AWS_REGION \
+        --query 'Stacks[0].Outputs[?OutputKey==`knowledgebaseid`].OutputValue' \
+        --output text)
+    
+    if [ -z "$KNOWLEDGE_BASE_ID" ]; then
+        print_error "Failed to retrieve Knowledge Base ID from stack outputs"
+        cd - > /dev/null
+        rollback_deployment 1
+    fi
+    
+    print_substep "Knowledge Base ID: $KNOWLEDGE_BASE_ID"
+    
+    # Get Document Bucket Name from stack outputs
+    print_substep "Retrieving Document Bucket Name from stack outputs..."
+    DOC_BUCKET_NAME=$(aws cloudformation describe-stacks \
+        --stack-name $BACKEND_STACK_NAME \
+        --region $AWS_REGION \
+        --query 'Stacks[0].Outputs[?OutputKey==`docbucketname`].OutputValue' \
+        --output text)
+    
+    if [ -z "$DOC_BUCKET_NAME" ]; then
+        print_error "Failed to retrieve Document Bucket Name from stack outputs"
+        cd - > /dev/null
+        rollback_deployment 1
+    fi
+    
+    print_substep "Document Bucket Name: $DOC_BUCKET_NAME"
+    
     print_step "Backend stack deployed successfully"
     echo "" >&2
     
     # Return to original directory
     cd "$OLDPWD" > /dev/null 2>&1 || cd - > /dev/null 2>&1 || true
-    
-    # Return ONLY the WebSocket URL (filter out any ARNs or other output)
-    # This ensures only the wss:// URL is returned
-    echo "$WEBSOCKET_URL" | grep -o 'wss://[^[:space:]]*'
 }
 
 build_frontend() {
     local websocket_url=$1
-    print_header "[Stage 2/3] Building Frontend"
+    print_header "[Stage 3/4] Building Frontend"
     
     # Make the frontend build script executable
     chmod +x "$FRONTEND_BUILD_SCRIPT"
@@ -251,15 +302,42 @@ build_frontend() {
     # Run the frontend build script
     if ! "$FRONTEND_BUILD_SCRIPT" "$websocket_url"; then
         print_error "Frontend build failed"
-        rollback_deployment 2
+        rollback_deployment 3
     fi
     
     print_step "Frontend build completed successfully"
     echo "" >&2
 }
 
+prepare_knowledge_base() {
+    print_header "[Stage 2/4] Preparing Knowledge Base"
+    
+    # Validate that required variables are set
+    if [ -z "$KNOWLEDGE_BASE_ID" ]; then
+        print_error "Knowledge Base ID not set (internal error)"
+        rollback_deployment 2
+    fi
+    
+    if [ -z "$DOC_BUCKET_NAME" ]; then
+        print_error "Document Bucket Name not set (internal error)"
+        rollback_deployment 2
+    fi
+    
+    # Make the bedrock script executable
+    chmod +x "$BEDROCK_SCRIPT"
+    
+    # Run the bedrock script
+    if ! "$BEDROCK_SCRIPT" "$KNOWLEDGE_BASE_ID" "$DOC_BUCKET_NAME" "$DOCUMENTS_SOURCE_DIR"; then
+        print_error "Knowledge Base preparation failed"
+        rollback_deployment 2
+    fi
+    
+    print_step "Knowledge Base ready"
+    echo "" >&2
+}
+
 deploy_frontend() {
-    print_header "[Stage 3/3] Deploying Frontend Stack"
+    print_header "[Stage 4/4] Deploying Frontend Stack"
     
     cd "$FRONTEND_DIR"
     
@@ -308,9 +386,6 @@ deploy_frontend() {
     echo "" >&2
     
     cd - > /dev/null
-    
-    # Return the Amplify URL (MUST be last line and only output to stdout)
-    echo "$AMPLIFY_URL"
 }
 
 ################################################################################
@@ -334,44 +409,47 @@ destroy_infrastructure() {
     fi
     
     # Step 1: Destroy frontend stack
-    print_substep "[1/6] Destroying $FRONTEND_STACK_NAME..."
+    print_substep "[1/7] Destroying $FRONTEND_STACK_NAME..."
     cd "$FRONTEND_DIR"
     if aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --region $AWS_REGION &> /dev/null; then
-        cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION || print_warning "Frontend stack destroy had issues (may already be deleted)"
+        cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION >&2 || print_warning "Frontend stack destroy had issues (may already be deleted)"
     else
         print_substep "Frontend stack not found (already deleted or never deployed)"
     fi
     cd - > /dev/null
     
     # Step 2: Remove build.zip
-    print_substep "[2/6] Removing build.zip..."
+    print_substep "[2/7] Removing build.zip..."
     rm -f "$FRONTEND_DIR/build.zip" 2>/dev/null || true
     
     # Step 3: Remove frontend/dist/
-    print_substep "[3/6] Removing frontend/dist/..."
+    print_substep "[3/7] Removing frontend/dist/..."
     rm -rf "$FRONTEND_DIR/frontend/dist" 2>/dev/null || true
     
     # Step 4: Remove frontend/node_modules/
-    print_substep "[4/6] Removing frontend/node_modules/..."
+    print_substep "[4/7] Removing frontend/node_modules/..."
     rm -rf "$FRONTEND_DIR/frontend/node_modules" 2>/dev/null || true
     
     # Step 5: Restore constants.jsx from backup
-    print_substep "[5/6] Restoring constants.jsx from backup..."
+    print_substep "[5/7] Restoring constants.jsx from backup..."
     CONSTANTS_FILE="$FRONTEND_DIR/frontend/src/app/components/constants.jsx"
     CONSTANTS_BACKUP="$FRONTEND_DIR/frontend/src/app/components/constants_backup.jsx"
     if [ -f "$CONSTANTS_BACKUP" ]; then
         cp "$CONSTANTS_BACKUP" "$CONSTANTS_FILE"
     fi
     
-    # Step 6: Destroy backend stack
-    print_substep "[6/6] Destroying $BACKEND_STACK_NAME..."
+    # Step 6: Destroy backend stack (includes S3 buckets with documents)
+    print_substep "[6/7] Destroying $BACKEND_STACK_NAME (includes document and vector buckets)..."
     cd "$BACKEND_DIR"
     if aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --region $AWS_REGION &> /dev/null; then
-        cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION || print_warning "Backend stack destroy had issues (may already be deleted)"
+        cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION >&2 || print_warning "Backend stack destroy had issues (may already be deleted)"
     else
         print_substep "Backend stack not found (already deleted or never deployed)"
     fi
     cd - > /dev/null
+    
+    # Step 7: Confirmation message
+    print_substep "[7/7] Cleanup completed"
     
     echo "" >&2
     print_step "All resources destroyed successfully!"
@@ -404,17 +482,30 @@ main() {
             run_preflight_checks
             
             # Stage 1: Deploy backend
-            WEBSOCKET_URL=$(deploy_backend)
+            deploy_backend
+            
+            # Validate that we got the required values
             if [ -z "$WEBSOCKET_URL" ]; then
                 print_error "Failed to retrieve WebSocket URL from backend deployment"
                 exit 1
             fi
+            if [ -z "$KNOWLEDGE_BASE_ID" ]; then
+                print_error "Failed to retrieve Knowledge Base ID from backend deployment"
+                exit 1
+            fi
+            if [ -z "$DOC_BUCKET_NAME" ]; then
+                print_error "Failed to retrieve Document Bucket Name from backend deployment"
+                exit 1
+            fi
             
-            # Stage 2: Build frontend
+            # Stage 2: Prepare Knowledge Base (upload docs and sync)
+            prepare_knowledge_base
+            
+            # Stage 3: Build frontend
             build_frontend "$WEBSOCKET_URL"
             
-            # Stage 3: Deploy frontend
-            AMPLIFY_URL=$(deploy_frontend)
+            # Stage 4: Deploy frontend
+            deploy_frontend
             
             # Success!
             print_header "Deployment Completed Successfully!"
@@ -422,6 +513,8 @@ main() {
             echo "" >&2
             echo "Deployment Details:" >&2
             echo "  • WebSocket API: $WEBSOCKET_URL" >&2
+            echo "  • Knowledge Base ID: $KNOWLEDGE_BASE_ID" >&2
+            echo "  • Document Bucket: $DOC_BUCKET_NAME" >&2
             if [ -n "$AMPLIFY_URL" ]; then
                 echo "  • Amplify App URL: $AMPLIFY_URL" >&2
             fi

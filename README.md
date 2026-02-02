@@ -1,0 +1,726 @@
+# Our Journey - Reentry Support Chatbot
+
+A React-based frontend application for Our Journey's chatbot system, designed to guide people returning from incarceration in North Carolina through the reentry process with personalized, verified resources.
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture Overview](#architecture-overview)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [Backend Integration](#backend-integration)
+- [Deployment](#deployment)
+- [Environment Variables](#environment-variables)
+- [API Documentation](#api-documentation)
+
+## Features
+
+### Journey Jones (JoJo) Chat UI
+- **Interactive Chatbot**: 24/7 conversational interface to help users navigate reentry resources
+- **Language Support**: English and Spanish
+- **Personalized Recommendations**: AI-powered guidance based on individual circumstances
+- **Resource Database**: Statewide verified resources for housing, employment, healthcare, and legal aid
+- **User Data Collection**: Captures location, release date, demographics for personalized assistance
+- **Safety Features**: Flags dangerous/self-harm questions for human follow-up
+- **Contact Collection**: Prompts for email/phone when human intervention is needed
+- **Session Management**: Maintains conversation context throughout the chat
+
+### Admin Analytics Dashboard
+- **Frequently Asked Questions**: View most common user queries
+- **Conversation Histories**: Review complete chat transcripts
+- **User Analytics**: Track engagement metrics and usage patterns
+- **Crisis Alerts**: Monitor flagged conversations requiring human follow-up
+- **Real-time Data**: Fetches analytics from backend API
+
+### Admin Login
+- Secure authentication system
+- Session management
+- Protected routes
+
+## Architecture Overview
+
+### System Architecture
+
+The application uses a serverless architecture on AWS:
+
+- **Frontend**: React application hosted on AWS Amplify
+- **Backend**: AWS Lambda functions with WebSocket API Gateway
+- **Knowledge Base**: AWS Bedrock Knowledge Base with verified NC reentry resources
+- **Storage**: DynamoDB for conversation history and user data
+- **Deployment**: Automated via AWS CDK
+
+### Why This Architecture?
+
+- **Stateless Lambda, Stateful Conversations**: Lambda functions are stateless, but DynamoDB maintains conversation context
+- **AI-Powered Responses**: AWS Bedrock provides intelligent, context-aware answers
+- **Reliable Resource Matching**: Knowledge base ensures users get verified, up-to-date information
+- **Crisis Detection**: Built-in safeguards to identify users in need of immediate support
+- **Scalable**: Handles varying traffic loads from individuals and case managers
+- **AWS Native**: Works seamlessly with Amplify + API Gateway
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- npm or yarn
+- AWS Account (for deployment)
+- AWS CLI configured (for deployment)
+
+### Installation
+
+1. **Clone the repository**:
+```bash
+git clone <repository-url>
+cd our-journey-frontend
+```
+
+2. **Install dependencies**:
+```bash
+cd frontend
+npm install
+```
+
+3. **Set up environment variables**:
+Create a `constants.jsx` file in `src/app/components/`:
+```javascript
+export const WEBSOCKET_URL = 'wss://your-websocket-api-url';
+```
+
+4. **Start the development server**:
+```bash
+npm run dev
+```
+
+5. **Open your browser**:
+Navigate to `http://localhost:5173`
+
+### Local Testing Checklist
+
+- Ensure `constants.jsx` is properly configured before running
+- Preferred run scripts:
+  - `npm run dev` for hot-reload development
+  - `npm run build` followed by `npm run preview` to validate the production build locally
+- If you hit network/API errors, open the browser console and Network tab to verify WebSocket connections are succeeding
+- Test both English and Spanish language modes
+- Verify geolocation prompts work in browser
+
+## Project Structure
+
+```
+our-journey-frontend/
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── components/
+│   │   │   │   ├── constants.jsx        # WebSocket URL configuration
+│   │   │   │   ├── constants_backup.jsx # Backup for deployment
+│   │   │   │   ├── ChatMessage.jsx
+│   │   │   │   ├── ResourceCard.jsx
+│   │   │   │   └── Sidebar.jsx
+│   │   │   ├── context/
+│   │   │   │   └── AuthContext.jsx
+│   │   │   ├── pages/
+│   │   │   │   ├── AdminLogin.jsx
+│   │   │   │   ├── AdminDashboard.jsx
+│   │   │   │   └── Chatbot.jsx
+│   │   │   └── services/
+│   │   │       └── websocket.js         # WebSocket service layer
+│   │   ├── styles/
+│   │   │   ├── Chatbot.css
+│   │   │   └── AdminDashboard.css
+│   │   └── App.jsx
+│   ├── package.json
+│   └── vite.config.js
+├── cdk/                    # AWS CDK infrastructure
+├── build.zip              # Production build artifact
+└── README.md
+```
+
+## Backend Integration
+
+The application uses WebSocket connections for real-time chat communication. All WebSocket interactions are centralized in `src/app/services/websocket.js`.
+
+### WebSocket Communication
+
+#### Chat Message
+- **Protocol**: WebSocket (wss://)
+- **Message Format**:
+```json
+{
+  "action": "sendMessage",
+  "message": "I need help finding housing",
+  "language": "en",
+  "sessionId": "session_12345",
+  "userId": "user_67890",
+  "location": "Durham, NC",
+  "releaseDate": "2024-01-15",
+  "gender": "prefer_not_to_say",
+  "over18": true
+}
+```
+
+- **Response Format**:
+```json
+{
+  "type": "message",
+  "content": "I can help you find housing resources in Durham...",
+  "resources": [
+    {
+      "name": "Our Journey Housing Program",
+      "type": "housing",
+      "location": "Durham, NC",
+      "contact": "555-0100",
+      "url": "https://ourjourney2gether.com/housing"
+    }
+  ],
+  "flagged": false
+}
+```
+
+#### Crisis Detection
+When dangerous/self-harm content is detected:
+```json
+{
+  "type": "crisis_detected",
+  "content": "I notice you may be experiencing a crisis...",
+  "promptForContact": true,
+  "message": "Would you like to speak with someone who can help?"
+}
+```
+
+#### FAQ Request
+- **Message**:
+```json
+{
+  "action": "getFAQs",
+  "limit": 10
+}
+```
+
+- **Response**:
+```json
+{
+  "type": "faqs",
+  "questions": [
+    {
+      "question": "How do I find housing after release?",
+      "count": 145,
+      "category": "housing"
+    }
+  ]
+}
+```
+
+#### Admin Analytics
+- **Message**:
+```json
+{
+  "action": "getAnalytics",
+  "dateRange": "30d"
+}
+```
+
+- **Response**:
+```json
+{
+  "type": "analytics",
+  "totalConversations": 1250,
+  "uniqueUsers": 823,
+  "topQuestions": [...],
+  "flaggedConversations": 12,
+  "resourceRequests": {
+    "housing": 456,
+    "employment": 389,
+    "healthcare": 234,
+    "legal": 171
+  }
+}
+```
+
+## Deployment
+
+### Automated Deployment with setup.sh
+
+The project includes an automated deployment script that handles all infrastructure setup:
+
+```bash
+# Deploy all infrastructure
+./setup.sh deploy
+
+# Destroy all infrastructure
+./setup.sh destroy
+```
+
+The deployment process includes:
+1. **Backend Stack**: WebSocket API, Lambda functions, Bedrock Knowledge Base
+2. **Knowledge Base Setup**: Uploads verified resources and syncs with Bedrock
+3. **Frontend Build**: Compiles React app and packages for deployment
+4. **Frontend Stack**: Deploys to AWS Amplify with S3 backing
+
+### Manual Deployment Steps
+
+#### Step 1: Deploy Backend Infrastructure
+
+```bash
+cd our-journey
+cdk deploy OurJourneyStack --region us-east-1
+```
+
+This creates:
+- WebSocket API Gateway
+- Lambda functions for chat processing
+- DynamoDB tables for conversations and user data
+- Bedrock Knowledge Base
+- S3 bucket for resource documents
+
+#### Step 2: Upload Knowledge Base Documents
+
+```bash
+# Run the bedrock setup script
+./bedrock.sh <knowledge-base-id> <doc-bucket-name> ./our-journey/S3
+```
+
+This uploads verified NC reentry resources from:
+- Home Plan Assistance guides
+- Job search resources
+- Essential services directory
+- MAT (Medication-Assisted Treatment) information
+- County-specific reentry guides
+
+#### Step 3: Build Frontend
+
+```bash
+cd our-journey-frontend/frontend
+npm install
+npm run build
+```
+
+#### Step 4: Deploy Frontend
+
+```bash
+cd ..
+cdk deploy OurJourneyFrontendStack --region us-east-1
+```
+
+This creates:
+- AWS Amplify application
+- Deploys build artifacts
+- Configures custom domain (optional)
+
+### Environment Configuration
+
+The deployment script automatically:
+- Extracts WebSocket URL from backend deployment
+- Updates `constants.jsx` with the WebSocket endpoint
+- Backs up the original constants file
+- Restores the backup after deployment
+
+### Verification Checklist
+
+After deployment:
+- [ ] Visit Amplify app URL and verify chatbot loads
+- [ ] Test English and Spanish language modes
+- [ ] Send a test message and verify response
+- [ ] Test "near me" location functionality
+- [ ] Verify admin login at `/admin/login`
+- [ ] Check admin dashboard displays analytics
+- [ ] Test crisis detection flagging
+- [ ] Verify email notifications for flagged conversations
+
+## Environment Variables
+
+### Frontend Configuration
+
+The frontend uses a constants file instead of environment variables:
+
+**File**: `frontend/src/app/components/constants.jsx`
+```javascript
+export const WEBSOCKET_URL = 'wss://abc123.execute-api.us-east-1.amazonaws.com/prod';
+```
+
+### Backend Configuration
+
+Set in AWS CDK stack:
+- `BEDROCK_KNOWLEDGE_BASE_ID`: ID of the Bedrock Knowledge Base
+- `DYNAMODB_TABLE_NAME`: Conversation history table
+- `USER_DATA_TABLE_NAME`: User information table
+- `ALERT_EMAIL`: Email address for crisis notifications (contact@ourjourney2gether.com)
+
+## API Documentation
+
+### WebSocket Actions
+
+#### sendMessage
+Send a chat message to Journey Jones (JoJo)
+
+**Payload**:
+```json
+{
+  "action": "sendMessage",
+  "message": "I need help finding a job",
+  "language": "en" | "es",
+  "sessionId": "unique_session_id",
+  "userId": "unique_user_id",
+  "location": "City, NC",
+  "releaseDate": "YYYY-MM-DD",
+  "gender": "male" | "female" | "other" | "prefer_not_to_say",
+  "over18": true | false
+}
+```
+
+**Response**:
+```json
+{
+  "type": "message",
+  "content": "AI-generated response text",
+  "resources": [
+    {
+      "name": "Resource name",
+      "type": "housing" | "employment" | "healthcare" | "legal",
+      "location": "City, NC",
+      "contact": "Phone number",
+      "url": "Resource URL",
+      "description": "Brief description"
+    }
+  ],
+  "flagged": false,
+  "requiresFollowUp": false
+}
+```
+
+#### submitContactInfo
+Submit contact information for human follow-up
+
+**Payload**:
+```json
+{
+  "action": "submitContactInfo",
+  "sessionId": "unique_session_id",
+  "email": "user@example.com",
+  "phone": "555-0100",
+  "preferredContact": "email" | "phone"
+}
+```
+
+**Response**:
+```json
+{
+  "type": "confirmation",
+  "message": "Thank you. A team member will contact you within 24 hours.",
+  "emailSent": true
+}
+```
+
+#### getFAQs
+Retrieve frequently asked questions
+
+**Payload**:
+```json
+{
+  "action": "getFAQs",
+  "limit": 10,
+  "category": "all" | "housing" | "employment" | "healthcare" | "legal"
+}
+```
+
+**Response**:
+```json
+{
+  "type": "faqs",
+  "questions": [
+    {
+      "id": "faq_123",
+      "question": "How do I expunge my record?",
+      "answer": "Brief answer...",
+      "count": 89,
+      "category": "legal",
+      "lastAsked": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+#### getConversationHistory (Admin)
+Retrieve conversation histories
+
+**Payload**:
+```json
+{
+  "action": "getConversationHistory",
+  "sessionId": "optional_session_id",
+  "flaggedOnly": false,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**Response**:
+```json
+{
+  "type": "conversations",
+  "total": 1250,
+  "conversations": [
+    {
+      "sessionId": "session_123",
+      "userId": "user_456",
+      "startTime": "2024-01-15T14:20:00Z",
+      "messageCount": 8,
+      "flagged": true,
+      "followUpRequested": true,
+      "userContact": "user@example.com",
+      "messages": [...]
+    }
+  ]
+}
+```
+
+## Supported Languages
+
+| Code | Language |
+|------|----------|
+| `en` | English (Default) |
+| `es` | Spanish (Español) |
+
+**Note**: Language selection affects all chatbot responses and UI elements.
+
+## Features in Detail
+
+### Chatbot Features
+
+- **Resource Prioritization**: Our Journey resources shown first, followed by other verified NC resources
+- **Personalized Guidance**: AI tailors responses based on user's location, release date, and needs
+- **Crisis Detection**: Automatically identifies concerning language and prompts for help
+- **Multi-step Collection**: Gathers user information progressively through conversation
+- **Session Persistence**: Maintains context throughout the user's journey
+- **Bilingual Support**: Full English and Spanish language support
+
+### Admin Dashboard Features
+
+- **FAQ Analytics**: Most frequently asked questions with category breakdown
+- **Conversation Monitoring**: Review all chat histories with search and filter
+- **Crisis Alerts**: Highlighted view of flagged conversations needing attention
+- **User Insights**: Demographics and usage patterns
+- **Resource Effectiveness**: Track which resources are most recommended
+- **Real-time Updates**: Dashboard refreshes with latest data
+
+### Safety Features
+
+- **Keyword Detection**: Monitors for self-harm and dangerous content
+- **Human Escalation**: Automatically prompts for contact information
+- **Email Notifications**: Sends conversation details to contact@ourjourney2gether.com
+- **Privacy Protection**: User data encrypted and access-controlled
+- **Consent Required**: Users opt-in to data collection
+
+## Troubleshooting
+
+### Common Issues
+
+1. **WebSocket Connection Errors**:
+   - Verify `constants.jsx` has correct WebSocket URL
+   - Check AWS API Gateway WebSocket API is deployed
+   - Ensure CORS is configured on API Gateway
+   - Check browser console for connection errors
+
+2. **Build Failures**:
+   - Ensure all dependencies are installed: `npm install`
+   - Check Node.js version (v16+)
+   - Clear cache: `rm -rf node_modules package-lock.json && npm install`
+   - Verify `constants.jsx` exists
+
+3. **Deployment Issues**:
+   - Verify AWS credentials are configured
+   - Check CDK is bootstrapped: `cdk bootstrap`
+   - Ensure Bedrock is available in us-east-1
+   - Review CloudFormation stack events for errors
+
+4. **Language Switching**:
+   - Verify language parameter is passed to WebSocket
+   - Check Bedrock Knowledge Base has Spanish translations
+   - Ensure UI text translations are complete
+
+5. **Crisis Detection Not Working**:
+   - Verify Lambda function has correct environment variables
+   - Check CloudWatch logs for detection algorithm
+   - Ensure email notification service is configured
+
+## Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server (port 5173)
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build locally
+- `npm run lint` - Run ESLint
+- `npm run format` - Format code with Prettier
+
+### Code Structure
+
+- **WebSocket Layer**: `src/app/services/websocket.js` - Centralized WebSocket communication
+- **Components**: Modular, reusable React components with green/black branding
+- **Styling**: Poppins font throughout, component-specific CSS files
+- **State Management**: React Context for authentication and session state
+- **i18n**: Language switching via context provider
+
+### Design System
+
+**Colors**:
+- Primary: Green (from Our Journey logo)
+- Secondary: Black
+- Accent: White
+- Alert: Red (for crisis detection)
+
+**Typography**:
+- Font Family: Poppins
+- Headings: Poppins Bold
+- Body: Poppins Regular
+- UI Elements: Poppins Medium
+
+**Accessibility**:
+- WCAG 2.1 AA compliant
+- Screen reader friendly
+- Keyboard navigation support
+- High contrast mode
+
+## User Guide
+
+### For Individuals Returning from Incarceration
+
+1. **Starting a Conversation**:
+   - Visit the Our Journey chatbot
+   - Select English or Spanish
+   - Say hello to Journey Jones (JoJo)
+   - Answer initial questions about your situation
+
+2. **Getting Help**:
+   - Ask about housing, jobs, healthcare, or legal services
+   - Mention your location (city or county in NC)
+   - Be specific about your needs
+   - JoJo will provide personalized resources
+
+3. **Using Resources**:
+   - Click on recommended resources for more details
+   - Contact information is provided for each resource
+   - Our Journey resources are prioritized
+
+4. **If You Need Urgent Help**:
+   - JoJo will detect if you're in crisis
+   - You'll be asked to provide contact information
+   - A team member will reach out within 24 hours
+
+### For Case Managers and Organizations
+
+1. **Quick Client Support**:
+   - Use the chatbot to quickly find resources for clients
+   - Share the chatbot link with clients for 24/7 access
+   - Review conversation histories to understand client needs
+
+2. **Admin Dashboard**:
+   - Login at `/admin/login`
+   - View frequently asked questions to understand common needs
+   - Monitor flagged conversations for clients needing extra support
+   - Access analytics to improve services
+
+## Security Considerations
+
+- **Data Encryption**: All data encrypted in transit and at rest
+- **User Privacy**: No personally identifiable information required for basic chat
+- **Contact Information**: Only collected when user opts in for follow-up
+- **HTTPS Required**: All connections must use secure protocols
+- **Admin Authentication**: Dashboard protected with secure login
+- **Session Isolation**: Each conversation is isolated and secure
+- **Crisis Protocol**: Flagged conversations trigger secure notification workflow
+
+## Coding Standards & Repository Hygiene
+
+- **Framework**: React 18 with Vite 5. Keep components small, use hooks, colocate styles
+- **Data Access**: Route all WebSocket calls through `src/app/services/websocket.js`
+- **State Management**: Use context for shared state (auth, session); component state for local UI
+- **Styling**: CSS files are component-scoped; follow Poppins font and green/black color scheme
+- **Build Checks**: Run `npm run build` before pushing to catch issues early
+- **Git Hygiene**: Keep `constants.jsx` backup in version control; use clear commit messages
+- **Documentation**: Update README when adding features or changing architecture
+
+## Deployment Automation
+
+### setup.sh Script
+
+The `setup.sh` script provides a complete deployment workflow:
+
+**Deploy Command**:
+```bash
+./setup.sh deploy
+```
+
+Performs:
+1. Pre-flight checks (AWS CLI, CDK, npm, directories)
+2. Backend stack deployment
+3. Knowledge Base document upload and sync
+4. Frontend build with dynamic configuration
+5. Frontend stack deployment to Amplify
+6. Output of all deployment URLs and IDs
+
+**Destroy Command**:
+```bash
+./setup.sh destroy
+```
+
+Performs:
+1. Frontend stack destruction
+2. Build artifact cleanup
+3. Backend stack destruction (including S3 buckets)
+4. Configuration file restoration
+5. Confirmation of complete teardown
+
+**Features**:
+- Color-coded output for readability
+- Automatic rollback on failure
+- Configuration file backup/restore
+- Comprehensive error handling
+- Stage-by-stage progress reporting
+
+## Knowledge Base Content
+
+The chatbot's knowledge base includes verified NC reentry resources:
+
+- **Housing**: Emergency shelter, transitional housing, permanent housing programs
+- **Employment**: Job training, placement services, expungement assistance
+- **Healthcare**: Mental health services, substance abuse treatment, MAT programs
+- **Legal Aid**: Record expungement, driver's license restoration, child support
+- **Essential Services**: Food assistance, clothing, transportation
+- **County Guides**: Specific resources for all 100 NC counties
+
+Resources are regularly updated and verified by the Our Journey team.
+
+## Support
+
+For issues or questions:
+
+1. **Technical Issues**:
+   - Check browser console for errors
+   - Review WebSocket connection in Network tab
+   - Verify `constants.jsx` configuration
+   - Check AWS CloudWatch logs
+
+2. **Resource Updates**:
+   - Contact: contact@ourjourney2gether.com
+   - Submit updated resources through admin portal
+   - Resources reviewed and added within 48 hours
+
+3. **Crisis Support**:
+   - Flagged conversations monitored 24/7
+   - Response within 24 hours
+   - Emergency: Contact local crisis services
+
+## Mission
+
+OurJourney believes that our communities are stronger, safer and more complete when people returning after incarceration don't go back. Therefore, we exist to support people on their reentry journey and to raise awareness about the challenges they face.
+
+## Acknowledgments
+
+Built for Our Journey to support successful reintegration and reduce recidivism in North Carolina communities.
+
+---
+
+**Customer Contact**: brian.scott@ourjourney2gether.com  
+**Website**: https://www.ourjourney2gether.com

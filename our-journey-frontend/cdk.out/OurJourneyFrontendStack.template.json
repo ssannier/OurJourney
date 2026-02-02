@@ -12,7 +12,7 @@
       }
      ]
     },
-    "BucketName": "our-journey-frontend-store-15f86352",
+    "BucketName": "our-journey-frontend-store-6beb74da",
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
      "BlockPublicPolicy": true,
@@ -276,7 +276,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/504d5e726ae54dd86143f0271d76f8b7339047bad7a25aa7a83d5d9fe52faf8f.zip\",\"Bucket\":\"",
+       "/d884f6f0c833251a0d92642068649bce5dbb3c899b8f2d9ee0b07afb0c7e2d13.zip\",\"Bucket\":\"",
        {
         "Ref": "FrontendStoreBucketC891F5ED"
        },
@@ -327,7 +327,7 @@
           {
            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "/504d5e726ae54dd86143f0271d76f8b7339047bad7a25aa7a83d5d9fe52faf8f.zip"
+          "/d884f6f0c833251a0d92642068649bce5dbb3c899b8f2d9ee0b07afb0c7e2d13.zip"
          ]
         ]
        }
@@ -482,7 +482,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-amplify-lambda-role-15f86352"
+    "RoleName": "our-journey-amplify-lambda-role-6beb74da"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AmplifyDeploymentLambdaRole/Resource"
@@ -573,10 +573,10 @@
        "Ref": "FrontendStoreBucketC891F5ED"
       },
       "FRONTEND_FOLDER_NAME": "/build/",
-      "AMPLIFY_APP_NAME": "OurJourneyApp-15f86352"
+      "AMPLIFY_APP_NAME": "OurJourneyApp-6beb74da"
      }
     },
-    "FunctionName": "our-journey-amplify-deployment-15f86352",
+    "FunctionName": "our-journey-amplify-deployment-6beb74da",
     "Handler": "lambda_function.lambda_handler",
     "Role": {
      "Fn::GetAtt": [

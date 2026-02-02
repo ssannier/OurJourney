@@ -115,6 +115,11 @@ class OurJourneyStack(Stack):
             value = web_socket_api.api_endpoint,
         )
 
+        CfnOutput(self, "doc-bucket-name",
+            value = doc_bucket.bucket_name,
+        )
+
+
         CfnOutput(self, "knowledge-base-id",
             value = kb.knowledge_base_id,
         )
