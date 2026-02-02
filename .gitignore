@@ -9,5 +9,7 @@ our-journey/.cdk.staging/
 our-journey/cdk.out/
 
 
-# Ignore frontend npm
-our-journey/frontend/node_modules/
+# Ignore frontend npm & .venv
+our-journey-frontend/.venv/
+our-journey-frontend/frontend/node_modules/
+our-journey-frontend/frontend/dist/

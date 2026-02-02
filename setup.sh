@@ -1,0 +1,453 @@
+#!/bin/bash
+
+################################################################################
+# Our Journey Infrastructure Setup Script
+# 
+# Usage:
+#   ./setup.sh deploy   - Deploy all infrastructure
+#   ./setup.sh destroy  - Destroy all infrastructure
+#
+# This script orchestrates the deployment of:
+#   1. Backend Stack (WebSocket API, Lambda, Bedrock Knowledge Base)
+#   2. Frontend Build (npm build and zip creation)
+#   3. Frontend Stack (S3, Amplify, Lambda Custom Resource)
+################################################################################
+
+# Note: Not using 'set -e' globally as CDK commands may have non-standard exit codes
+set -o pipefail  # Catch errors in pipes
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+AWS_REGION="us-east-1"
+BACKEND_STACK_NAME="OurJourneyStack"
+FRONTEND_STACK_NAME="OurJourneyFrontendStack"
+BACKEND_DIR="./our-journey"
+FRONTEND_DIR="./our-journey-frontend"
+FRONTEND_BUILD_SCRIPT="./frontend_build.sh"
+
+################################################################################
+# Utility Functions
+################################################################################
+
+print_header() {
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+    echo -e "${BLUE}$1${NC}" >&2
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+}
+
+print_step() {
+    echo -e "${GREEN}[✓]${NC} $1" >&2
+}
+
+print_substep() {
+    echo -e "    ${BLUE}├─${NC} $1" >&2
+}
+
+print_error() {
+    echo -e "${RED}[✗]${NC} $1" >&2
+}
+
+print_warning() {
+    echo -e "${YELLOW}[⚠]${NC} $1" >&2
+}
+
+################################################################################
+# Pre-flight Checks
+################################################################################
+
+run_preflight_checks() {
+    print_header "Running Pre-flight Checks"
+    
+    # Check if CDK is installed
+    if ! command -v cdk &> /dev/null; then
+        print_error "AWS CDK is not installed"
+        echo "Please install CDK: npm install -g aws-cdk" >&2
+        exit 1
+    fi
+    CDK_VERSION=$(cdk --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    print_substep "AWS CDK installed ($CDK_VERSION)"
+    
+    # Check if AWS CLI is installed and credentials are configured
+    if ! command -v aws &> /dev/null; then
+        print_error "AWS CLI is not installed"
+        echo "Please install AWS CLI: https://aws.amazon.com/cli/" >&2
+        exit 1
+    fi
+    print_substep "AWS CLI installed"
+    
+    # Check AWS credentials
+    if ! aws sts get-caller-identity --region $AWS_REGION &> /dev/null; then
+        print_error "AWS credentials not configured or invalid"
+        echo "Please configure AWS credentials: aws configure" >&2
+        exit 1
+    fi
+    AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text --region $AWS_REGION)
+    print_substep "AWS credentials configured (Account: $AWS_ACCOUNT)"
+    
+    # Check if CDK is bootstrapped
+    BOOTSTRAP_STACK_NAME="CDKToolkit"
+    if ! aws cloudformation describe-stacks --stack-name $BOOTSTRAP_STACK_NAME --region $AWS_REGION &> /dev/null; then
+        print_error "CDK is not bootstrapped in $AWS_REGION"
+        echo "Please bootstrap CDK: cdk bootstrap aws://$AWS_ACCOUNT/$AWS_REGION" >&2
+        exit 1
+    fi
+    print_substep "CDK bootstrapped in $AWS_REGION"
+    
+    # Check if npm is installed (needed for frontend build)
+    if ! command -v npm &> /dev/null; then
+        print_error "npm is not installed"
+        echo "Please install Node.js and npm: https://nodejs.org/" >&2
+        exit 1
+    fi
+    NPM_VERSION=$(npm --version)
+    print_substep "npm installed ($NPM_VERSION)"
+    
+    # Check if required directories exist
+    if [ ! -d "$BACKEND_DIR" ]; then
+        print_error "Backend directory not found: $BACKEND_DIR"
+        exit 1
+    fi
+    print_substep "Backend directory exists"
+    
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        print_error "Frontend directory not found: $FRONTEND_DIR"
+        exit 1
+    fi
+    print_substep "Frontend directory exists"
+    
+    # Check if constants backup file exists
+    CONSTANTS_BACKUP="$FRONTEND_DIR/frontend/src/app/components/constants_backup.jsx"
+    if [ ! -f "$CONSTANTS_BACKUP" ]; then
+        print_error "Constants backup file not found: $CONSTANTS_BACKUP"
+        exit 1
+    fi
+    print_substep "constants_backup.jsx exists"
+    
+    # Check if frontend build script exists
+    if [ ! -f "$FRONTEND_BUILD_SCRIPT" ]; then
+        print_error "Frontend build script not found: $FRONTEND_BUILD_SCRIPT"
+        exit 1
+    fi
+    print_substep "frontend_build.sh exists"
+    
+    print_step "All pre-flight checks passed"
+    echo "" >&2
+}
+
+################################################################################
+# Rollback Function
+################################################################################
+
+rollback_deployment() {
+    local stage=$1
+    print_header "Rolling Back Deployment (Failed at Stage $stage)"
+    
+    # Restore constants file
+    CONSTANTS_FILE="$FRONTEND_DIR/frontend/src/app/components/constants.jsx"
+    CONSTANTS_BACKUP="$FRONTEND_DIR/frontend/src/app/components/constants_backup.jsx"
+    
+    if [ -f "$CONSTANTS_BACKUP" ]; then
+        print_substep "Restoring constants.jsx from backup..."
+        cp "$CONSTANTS_BACKUP" "$CONSTANTS_FILE" 2>/dev/null || true
+    fi
+    
+    # Remove build artifacts
+    print_substep "Removing build artifacts..."
+    rm -f "$FRONTEND_DIR/build.zip" 2>/dev/null || true
+    rm -rf "$FRONTEND_DIR/frontend/dist" 2>/dev/null || true
+    rm -rf "$FRONTEND_DIR/frontend/node_modules" 2>/dev/null || true
+    
+    # Destroy stacks based on which stage failed
+    if [ "$stage" -ge 3 ]; then
+        print_substep "Destroying frontend stack..."
+        cd "$FRONTEND_DIR"
+        cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION 2>/dev/null || true
+        cd - > /dev/null
+    fi
+    
+    if [ "$stage" -ge 2 ]; then
+        print_substep "Destroying backend stack..."
+        cd "$BACKEND_DIR"
+        cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION 2>/dev/null || true
+        cd - > /dev/null
+    fi
+    
+    print_error "Deployment failed and has been rolled back"
+    exit 1
+}
+
+################################################################################
+# Deploy Functions
+################################################################################
+
+deploy_backend() {
+    print_header "[Stage 1/3] Deploying Backend Stack"
+    
+    cd "$BACKEND_DIR"
+    
+    # Verify stack name in app.py
+    if ! grep -q "$BACKEND_STACK_NAME" app.py; then
+        print_error "Stack name mismatch in $BACKEND_DIR/app.py"
+        print_error "Expected: $BACKEND_STACK_NAME"
+        cd - > /dev/null
+        rollback_deployment 1
+    fi
+    print_substep "Stack name validated: $BACKEND_STACK_NAME"
+    
+    # Deploy the stack
+    print_substep "Deploying $BACKEND_STACK_NAME to $AWS_REGION..."
+    
+    # Deploy with output to stderr (so it's visible but doesn't contaminate our return value)
+    if ! cdk deploy $BACKEND_STACK_NAME --require-approval never --region $AWS_REGION >&2; then
+        print_error "Backend stack deployment failed"
+        cd "$OLDPWD" > /dev/null 2>&1 || cd - > /dev/null 2>&1 || true
+        rollback_deployment 1
+    fi
+    
+    # Get WebSocket URL from stack outputs
+    print_substep "Retrieving WebSocket URL from stack outputs..."
+    WEBSOCKET_URL=$(aws cloudformation describe-stacks \
+        --stack-name $BACKEND_STACK_NAME \
+        --region $AWS_REGION \
+        --query 'Stacks[0].Outputs[?OutputKey==`websocketurl`].OutputValue' \
+        --output text)
+    
+    if [ -z "$WEBSOCKET_URL" ]; then
+        print_error "Failed to retrieve WebSocket URL from stack outputs"
+        cd - > /dev/null
+        rollback_deployment 1
+    fi
+    
+    print_substep "Base WebSocket URL: $WEBSOCKET_URL"
+    
+    # Add /prod/ to the WebSocket URL
+    WEBSOCKET_URL="${WEBSOCKET_URL}/prod/"
+    
+    print_substep "Full WebSocket URL (with /prod/): $WEBSOCKET_URL"
+    print_step "Backend stack deployed successfully"
+    echo "" >&2
+    
+    # Return to original directory
+    cd "$OLDPWD" > /dev/null 2>&1 || cd - > /dev/null 2>&1 || true
+    
+    # Return ONLY the WebSocket URL (filter out any ARNs or other output)
+    # This ensures only the wss:// URL is returned
+    echo "$WEBSOCKET_URL" | grep -o 'wss://[^[:space:]]*'
+}
+
+build_frontend() {
+    local websocket_url=$1
+    print_header "[Stage 2/3] Building Frontend"
+    
+    # Make the frontend build script executable
+    chmod +x "$FRONTEND_BUILD_SCRIPT"
+    
+    # Run the frontend build script
+    if ! "$FRONTEND_BUILD_SCRIPT" "$websocket_url"; then
+        print_error "Frontend build failed"
+        rollback_deployment 2
+    fi
+    
+    print_step "Frontend build completed successfully"
+    echo "" >&2
+}
+
+deploy_frontend() {
+    print_header "[Stage 3/3] Deploying Frontend Stack"
+    
+    cd "$FRONTEND_DIR"
+    
+    # Verify stack name in app.py
+    if ! grep -q "$FRONTEND_STACK_NAME" app.py; then
+        print_error "Stack name mismatch in $FRONTEND_DIR/app.py"
+        print_error "Expected: $FRONTEND_STACK_NAME"
+        cd - > /dev/null
+        rollback_deployment 3
+    fi
+    print_substep "Stack name validated: $FRONTEND_STACK_NAME"
+    
+    # Verify build.zip exists
+    if [ ! -f "build.zip" ]; then
+        print_error "build.zip not found in $FRONTEND_DIR"
+        cd - > /dev/null
+        rollback_deployment 3
+    fi
+    print_substep "build.zip found"
+    
+    # Deploy the stack
+    print_substep "Deploying $FRONTEND_STACK_NAME to $AWS_REGION..."
+    
+    # Deploy with live output (removed output capturing)
+    if ! cdk deploy $FRONTEND_STACK_NAME --require-approval never --region $AWS_REGION; then
+        print_error "Frontend stack deployment failed"
+        cd "$OLDPWD" > /dev/null 2>&1 || cd - > /dev/null 2>&1 || true
+        rollback_deployment 3
+    fi
+    
+    # Get Amplify URL from stack outputs
+    print_substep "Retrieving Amplify app URL from stack outputs..."
+    AMPLIFY_URL=$(aws cloudformation describe-stacks \
+        --stack-name $FRONTEND_STACK_NAME \
+        --region $AWS_REGION \
+        --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppUrl`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$AMPLIFY_URL" ]; then
+        print_substep "Amplify App URL: $AMPLIFY_URL"
+    else
+        print_warning "Amplify URL not available yet - check Amplify console"
+    fi
+    
+    print_step "Frontend stack deployed successfully"
+    echo "" >&2
+    
+    cd - > /dev/null
+    
+    # Return the Amplify URL (MUST be last line and only output to stdout)
+    echo "$AMPLIFY_URL"
+}
+
+################################################################################
+# Destroy Functions
+################################################################################
+
+destroy_infrastructure() {
+    print_header "Destroying Our Journey Infrastructure"
+    
+    echo -e "${YELLOW}WARNING: This will destroy all Our Journey infrastructure in $AWS_REGION${NC}" >&2
+    echo -e "  - $BACKEND_STACK_NAME (Backend: WebSocket, Lambda, Bedrock KB)" >&2
+    echo -e "  - $FRONTEND_STACK_NAME (Frontend: S3, Amplify, Lambda)" >&2
+    echo "" >&2
+    
+    # Confirmation prompt
+    read -p "Are you sure you want to continue? (yes/no): " -r
+    echo "" >&2
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        echo "Destroy cancelled" >&2
+        exit 0
+    fi
+    
+    # Step 1: Destroy frontend stack
+    print_substep "[1/6] Destroying $FRONTEND_STACK_NAME..."
+    cd "$FRONTEND_DIR"
+    if aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --region $AWS_REGION &> /dev/null; then
+        cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION || print_warning "Frontend stack destroy had issues (may already be deleted)"
+    else
+        print_substep "Frontend stack not found (already deleted or never deployed)"
+    fi
+    cd - > /dev/null
+    
+    # Step 2: Remove build.zip
+    print_substep "[2/6] Removing build.zip..."
+    rm -f "$FRONTEND_DIR/build.zip" 2>/dev/null || true
+    
+    # Step 3: Remove frontend/dist/
+    print_substep "[3/6] Removing frontend/dist/..."
+    rm -rf "$FRONTEND_DIR/frontend/dist" 2>/dev/null || true
+    
+    # Step 4: Remove frontend/node_modules/
+    print_substep "[4/6] Removing frontend/node_modules/..."
+    rm -rf "$FRONTEND_DIR/frontend/node_modules" 2>/dev/null || true
+    
+    # Step 5: Restore constants.jsx from backup
+    print_substep "[5/6] Restoring constants.jsx from backup..."
+    CONSTANTS_FILE="$FRONTEND_DIR/frontend/src/app/components/constants.jsx"
+    CONSTANTS_BACKUP="$FRONTEND_DIR/frontend/src/app/components/constants_backup.jsx"
+    if [ -f "$CONSTANTS_BACKUP" ]; then
+        cp "$CONSTANTS_BACKUP" "$CONSTANTS_FILE"
+    fi
+    
+    # Step 6: Destroy backend stack
+    print_substep "[6/6] Destroying $BACKEND_STACK_NAME..."
+    cd "$BACKEND_DIR"
+    if aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --region $AWS_REGION &> /dev/null; then
+        cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION || print_warning "Backend stack destroy had issues (may already be deleted)"
+    else
+        print_substep "Backend stack not found (already deleted or never deployed)"
+    fi
+    cd - > /dev/null
+    
+    echo "" >&2
+    print_step "All resources destroyed successfully!"
+}
+
+################################################################################
+# Main Function
+################################################################################
+
+main() {
+    # Check if argument is provided
+    if [ $# -eq 0 ]; then
+        echo "Usage: $0 {deploy|destroy}" >&2
+        echo "" >&2
+        echo "Commands:" >&2
+        echo "  deploy   - Deploy all infrastructure" >&2
+        echo "  destroy  - Destroy all infrastructure" >&2
+        exit 1
+    fi
+    
+    MODE=$1
+    
+    case $MODE in
+        deploy)
+            echo "" >&2
+            print_header "Our Journey - Deploy Mode"
+            echo "" >&2
+            
+            # Run pre-flight checks
+            run_preflight_checks
+            
+            # Stage 1: Deploy backend
+            WEBSOCKET_URL=$(deploy_backend)
+            if [ -z "$WEBSOCKET_URL" ]; then
+                print_error "Failed to retrieve WebSocket URL from backend deployment"
+                exit 1
+            fi
+            
+            # Stage 2: Build frontend
+            build_frontend "$WEBSOCKET_URL"
+            
+            # Stage 3: Deploy frontend
+            AMPLIFY_URL=$(deploy_frontend)
+            
+            # Success!
+            print_header "Deployment Completed Successfully!"
+            echo -e "${GREEN}✅ All infrastructure has been deployed${NC}" >&2
+            echo "" >&2
+            echo "Deployment Details:" >&2
+            echo "  • WebSocket API: $WEBSOCKET_URL" >&2
+            if [ -n "$AMPLIFY_URL" ]; then
+                echo "  • Amplify App URL: $AMPLIFY_URL" >&2
+            fi
+            echo "" >&2
+            echo "Next steps:" >&2
+            echo "  1. Visit your Amplify app URL above to access the application" >&2
+            echo "  2. Check AWS Amplify console for deployment status" >&2
+            echo "  3. Test the WebSocket connection from your app" >&2
+            echo "" >&2
+            ;;
+            
+        destroy)
+            echo "" >&2
+            print_header "Our Journey - Destroy Mode"
+            echo "" >&2
+            
+            destroy_infrastructure
+            ;;
+            
+        *)
+            echo "Invalid command: $MODE" >&2
+            echo "Usage: $0 {deploy|destroy}" >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

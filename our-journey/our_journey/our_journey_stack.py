@@ -6,10 +6,10 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_iam as iam,
     aws_s3 as s3,
-    aws_s3_deployment as s3deploy,
     CfnOutput,
 )
-from cdklabs.generative_ai_cdk_constructs import bedrock
+import aws_cdk as cdk
+from cdklabs.generative_ai_cdk_constructs import bedrock, s3vectors
 from constructs import Construct
 
 class OurJourneyStack(Stack):
@@ -18,18 +18,46 @@ class OurJourneyStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         
         # Create an S3 bucket to store documents
-        docBucket = s3.Bucket(self, 'DocBucket')
+        doc_bucket = s3.Bucket(
+            self, 
+            'DocBucket',
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            auto_delete_objects=True
+        )
 
         # Create a Bedrock Vector Knowledge Base
-        kb = bedrock.VectorKnowledgeBase(self, "knowledgebase",
-                                     embeddings_model=bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_256,
-                                     )
-        kb.add_s3_data_source(bucket=docBucket)
-        kb.add_web_crawler_data_source(source_urls=["https://www.ourjourney2gether.com/home-plan-assistance",
-                                                    "https://www.ourjourney2gether.com/find-a-job",
-                                                    "https://www.ourjourney2gether.com/essential-services",
-                                                    "https://www.ourjourney2gether.com/mat-assistance",
-                                                    "https://www.ourjourney2gether.com/reentry-resource-guides"])
+        kb = bedrock.VectorKnowledgeBase(
+            self, 
+            "knowledgebase",
+            embeddings_model=bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_256,
+            vector_store=s3vectors.VectorIndex(
+                self, 
+                "vectorstore",
+                dimension=256,
+                vector_bucket=s3vectors.VectorBucket(
+                    self, 
+                    "vector-bucket",
+                    removal_policy=cdk.RemovalPolicy.DESTROY,
+                    auto_delete_objects=True
+                ),
+                non_filterable_metadata_keys=[
+                    "AMAZON_BEDROCK_TEXT", 
+                    "AMAZON_BEDROCK_METADATA"
+                ]
+            )
+        )
+
+        kb.add_s3_data_source(
+            bucket=doc_bucket,
+            data_deletion_policy=bedrock.DataDeletionPolicy.RETAIN
+        )
+
+        # Use if you have an opensearch vector store rather than an S3 vector store
+        # kb.add_web_crawler_data_source(source_urls=["https://www.ourjourney2gether.com/home-plan-assistance",
+        #                                             "https://www.ourjourney2gether.com/find-a-job",
+        #                                             "https://www.ourjourney2gether.com/essential-services",
+        #                                             "https://www.ourjourney2gether.com/mat-assistance",
+        #                                             "https://www.ourjourney2gether.com/reentry-resource-guides"])
 
 
 
@@ -49,7 +77,7 @@ class OurJourneyStack(Stack):
             "bedrock-orchestration-lambda",
             runtime = _lambda.Runtime.PYTHON_3_12,
             code = _lambda.Code.from_asset(
-                "./lambdas/lambda_function",
+                "./lambdas/bedrock_orchestration",
             ),
             handler = "lambda_function.lambda_handler",
             timeout = Duration.minutes(15),
