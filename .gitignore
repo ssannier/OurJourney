@@ -8,6 +8,8 @@ our-journey/*.egg-info/
 our-journey/.cdk.staging/
 our-journey/cdk.out/
 
+our-journey-frontend/build.zip
+
 
 # Ignore frontend npm & .venv
 our-journey-frontend/.venv/
