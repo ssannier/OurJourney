@@ -189,6 +189,8 @@ Ensure you have access to the Nova Pro LLM model and Titan text embedding models
 
 6. Wait for the system to be deployed (may take up to 30 minutes)
 
+7. View the application at the deployed amplify link, which can be found in the amplify console page
+
 
 
 ## Supported Languages

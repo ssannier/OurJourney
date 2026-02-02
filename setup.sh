@@ -37,7 +37,6 @@ DOCUMENTS_SOURCE_DIR="./our-journey/S3"
 WEBSOCKET_URL=""
 KNOWLEDGE_BASE_ID=""
 DOC_BUCKET_NAME=""
-AMPLIFY_URL=""
 
 ################################################################################
 # Utility Functions
@@ -368,19 +367,8 @@ deploy_frontend() {
         rollback_deployment 3
     fi
     
-    # Get Amplify URL from stack outputs
-    print_substep "Retrieving Amplify app URL from stack outputs..."
-    AMPLIFY_URL=$(aws cloudformation describe-stacks \
-        --stack-name $FRONTEND_STACK_NAME \
-        --region $AWS_REGION \
-        --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppUrl`].OutputValue' \
-        --output text 2>/dev/null || echo "")
-    
-    if [ -n "$AMPLIFY_URL" ]; then
-        print_substep "Amplify App URL: $AMPLIFY_URL"
-    else
-        print_warning "Amplify URL not available yet - check Amplify console"
-    fi
+    # Amplify URL will be available in the console after deployment completes
+    print_substep "View your Amplify app URL in the AWS Amplify console"
     
     print_step "Frontend stack deployed successfully"
     echo "" >&2
@@ -515,9 +503,7 @@ main() {
             echo "  • WebSocket API: $WEBSOCKET_URL" >&2
             echo "  • Knowledge Base ID: $KNOWLEDGE_BASE_ID" >&2
             echo "  • Document Bucket: $DOC_BUCKET_NAME" >&2
-            if [ -n "$AMPLIFY_URL" ]; then
-                echo "  • Amplify App URL: $AMPLIFY_URL" >&2
-            fi
+            echo "  • Amplify Console: https://console.aws.amazon.com/amplify/home?region=$AWS_REGION" >&2
             echo "" >&2
             echo "Next steps:" >&2
             echo "  1. Visit your Amplify app URL above to access the application" >&2
