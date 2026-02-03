@@ -52,15 +52,6 @@ class OurJourneyStack(Stack):
             data_deletion_policy=bedrock.DataDeletionPolicy.RETAIN
         )
 
-        # Use if you have an opensearch vector store rather than an S3 vector store
-        # kb.add_web_crawler_data_source(source_urls=["https://www.ourjourney2gether.com/home-plan-assistance",
-        #                                             "https://www.ourjourney2gether.com/find-a-job",
-        #                                             "https://www.ourjourney2gether.com/essential-services",
-        #                                             "https://www.ourjourney2gether.com/mat-assistance",
-        #                                             "https://www.ourjourney2gether.com/reentry-resource-guides"])
-
-
-
         # Create a WebSocket API
         web_socket_api = apigwv2.WebSocketApi(self, "web_socket_api",)
         apigwv2.WebSocketStage(

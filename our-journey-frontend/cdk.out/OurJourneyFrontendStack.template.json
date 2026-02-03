@@ -65,7 +65,7 @@
     "UserPoolAddOns": {
      "AdvancedSecurityMode": "ENFORCED"
     },
-    "UserPoolName": "our-journey-user-pool-4dce8acd",
+    "UserPoolName": "our-journey-user-pool-64565105",
     "UsernameAttributes": [
      "email"
     ],
@@ -85,7 +85,7 @@
   "OurJourneyUserPoolOurJourneyCognitoDomainA567F322": {
    "Type": "AWS::Cognito::UserPoolDomain",
    "Properties": {
-    "Domain": "our-journey-app-4dce8acd",
+    "Domain": "our-journey-app-64565105",
     "UserPoolId": {
      "Ref": "OurJourneyUserPoolE1EB8C0A"
     }
@@ -152,7 +152,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-post-confirmation-role-4dce8acd"
+    "RoleName": "our-journey-post-confirmation-role-64565105"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/PostConfirmationLambdaRole/Resource"
@@ -201,7 +201,7 @@
       "DEFAULT_GROUP": "Users"
      }
     },
-    "FunctionName": "our-journey-post-confirmation-4dce8acd",
+    "FunctionName": "our-journey-post-confirmation-64565105",
     "Handler": "post_confirmation_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -291,7 +291,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-admin-creator-role-4dce8acd"
+    "RoleName": "our-journey-admin-creator-role-64565105"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AdminCreatorLambdaRole/Resource"
@@ -337,7 +337,7 @@
      "S3Key": "c5bfbe70e9a927367df2a07a707e5d8ee2bcc77cfc385f5e5e03d90788b4e53c.zip"
     },
     "Description": "Creates default admin user on stack creation",
-    "FunctionName": "our-journey-admin-creator-4dce8acd",
+    "FunctionName": "our-journey-admin-creator-64565105",
     "Handler": "create_admin_user_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -549,8 +549,8 @@
     "UserPoolId": {
      "Ref": "OurJourneyUserPoolE1EB8C0A"
     },
-    "AdminEmail": "mbrummun@asu.edu",
-    "AdminPassword": "N@wY@rk321",
+    "AdminEmail": "admin@ourjourney.local",
+    "AdminPassword": "AdminPassword123!",
     "AdminGroup": "Admins"
    },
    "DependsOn": [
@@ -580,7 +580,7 @@
      "http://localhost:5173",
      "https://example.com"
     ],
-    "ClientName": "our-journey-app-client-4dce8acd",
+    "ClientName": "our-journey-app-client-64565105",
     "EnableTokenRevocation": true,
     "ExplicitAuthFlows": [
      "ALLOW_USER_PASSWORD_AUTH",
@@ -632,7 +632,7 @@
       }
      ]
     },
-    "BucketName": "our-journey-frontend-store-4dce8acd",
+    "BucketName": "our-journey-frontend-store-64565105",
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
      "BlockPublicPolicy": true,
@@ -896,7 +896,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/e50e0a3de36e90bf3762e73c05b43818e07b4b6934e1d445b5ac0631c34bf026.zip\",\"Bucket\":\"",
+       "/c39605c4b42ab56ceb6c9ee5e09378e1f37f7cb06f8c2d806dcb03a7f2faaf70.zip\",\"Bucket\":\"",
        {
         "Ref": "FrontendStoreBucketC891F5ED"
        },
@@ -947,7 +947,7 @@
           {
            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "/e50e0a3de36e90bf3762e73c05b43818e07b4b6934e1d445b5ac0631c34bf026.zip"
+          "/c39605c4b42ab56ceb6c9ee5e09378e1f37f7cb06f8c2d806dcb03a7f2faaf70.zip"
          ]
         ]
        }
@@ -1102,7 +1102,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-amplify-lambda-role-4dce8acd"
+    "RoleName": "our-journey-amplify-lambda-role-64565105"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AmplifyDeploymentLambdaRole/Resource"
@@ -1207,7 +1207,7 @@
        "Ref": "FrontendStoreBucketC891F5ED"
       },
       "FRONTEND_FOLDER_NAME": "/build/",
-      "AMPLIFY_APP_NAME": "OurJourneyApp-4dce8acd",
+      "AMPLIFY_APP_NAME": "OurJourneyApp-64565105",
       "USER_POOL_ID": {
        "Ref": "OurJourneyUserPoolE1EB8C0A"
       },
@@ -1234,7 +1234,7 @@
       }
      }
     },
-    "FunctionName": "our-journey-amplify-deployment-4dce8acd",
+    "FunctionName": "our-journey-amplify-deployment-64565105",
     "Handler": "lambda_function.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -1551,7 +1551,7 @@
   },
   "DefaultAdminCredentials": {
    "Description": "⚠️  Default admin credentials - CHANGE PASSWORD IMMEDIATELY after first login!",
-   "Value": "Email: mbrummun@asu.edu | Password: N@wY@rk321"
+   "Value": "Email: admin@ourjourney.local | Password: AdminPassword123!"
   }
  },
  "Conditions": {

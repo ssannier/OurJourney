@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/c8750fd18ea47c48550eb9ffc0b44ecab7c9ce9f5689eec97032ee74c7631dea.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/e2f236c0516be3f2f81e0ca7bb607a231f69f36438a06dd2059e4c4b4a21efb4.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -1213,15 +1213,15 @@
             "type": "aws:cdk:warning",
             "data": "The following keys will be overwritten as they exist in the 'properties' prop. Keys found: ServiceTimeout [ack: @aws-cdk/core:customResourcePropConflict]",
             "trace": [
-              "Annotations.addMessage (/tmp/jsii-kernel-5UKGHE/node_modules/aws-cdk-lib/core/lib/annotations.js:1:2066)",
-              "Annotations.addWarningV2 (/tmp/jsii-kernel-5UKGHE/node_modules/aws-cdk-lib/core/lib/annotations.js:1:984)",
-              "new CustomResource2 (/tmp/jsii-kernel-5UKGHE/node_modules/aws-cdk-lib/core/lib/custom-resource.js:1:5136)",
-              "new CustomResource2 (/tmp/jsii-kernel-5UKGHE/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:681)",
-              "Kernel._Kernel_create (/tmp/tmp4b5jz49j/lib/program.js:549:25)",
-              "Kernel.create (/tmp/tmp4b5jz49j/lib/program.js:219:93)",
-              "KernelHost.processRequest (/tmp/tmp4b5jz49j/lib/program.js:15484:36)",
-              "KernelHost.run (/tmp/tmp4b5jz49j/lib/program.js:15444:22)",
-              "Immediate._onImmediate (/tmp/tmp4b5jz49j/lib/program.js:15445:45)",
+              "Annotations.addMessage (/tmp/jsii-kernel-pHZBuk/node_modules/aws-cdk-lib/core/lib/annotations.js:1:2066)",
+              "Annotations.addWarningV2 (/tmp/jsii-kernel-pHZBuk/node_modules/aws-cdk-lib/core/lib/annotations.js:1:984)",
+              "new CustomResource2 (/tmp/jsii-kernel-pHZBuk/node_modules/aws-cdk-lib/core/lib/custom-resource.js:1:5136)",
+              "new CustomResource2 (/tmp/jsii-kernel-pHZBuk/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:681)",
+              "Kernel._Kernel_create (/tmp/tmp9v5trrqa/lib/program.js:549:25)",
+              "Kernel.create (/tmp/tmp9v5trrqa/lib/program.js:219:93)",
+              "KernelHost.processRequest (/tmp/tmp9v5trrqa/lib/program.js:15484:36)",
+              "KernelHost.run (/tmp/tmp9v5trrqa/lib/program.js:15444:22)",
+              "Immediate._onImmediate (/tmp/tmp9v5trrqa/lib/program.js:15445:45)",
               "process.processImmediate (node:internal/timers:485:21)"
             ]
           }
