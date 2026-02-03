@@ -6,7 +6,10 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_iam as iam,
     aws_s3 as s3,
+    aws_events as events,
+    aws_events_targets as targets,
     CfnOutput,
+    CustomResource,
 )
 import aws_cdk as cdk
 from cdklabs.generative_ai_cdk_constructs import bedrock, s3vectors
@@ -102,6 +105,127 @@ class OurJourneyStack(Stack):
             return_response=True
         )
 
+        # ======================================================================
+        # SCRAPER LAMBDA LAYER
+        # ======================================================================
+        scraper_layer = _lambda.LayerVersion(
+            self,
+            "ScraperLayer",
+            code=_lambda.Code.from_asset("./lambdas/layers/scraper-layer.zip"),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            description="Web scraping dependencies (requests, BeautifulSoup4)"
+        )
+
+        # ======================================================================
+        # SCRAPER LAMBDA IAM ROLE
+        # ======================================================================
+        scraper_role = iam.Role(
+            self,
+            "ScraperLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            description="Execution role for OurJourney scraper and sync Lambda"
+        )
+
+        # S3 permissions for doc bucket
+        scraper_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="S3BucketAccess",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3:ListBucket",
+                    "s3:DeleteObject",
+                    "s3:PutObject",
+                ],
+                resources=[
+                    doc_bucket.bucket_arn,
+                    f"{doc_bucket.bucket_arn}/*"
+                ]
+            )
+        )
+
+        # Bedrock Agent permissions for knowledge base sync
+        scraper_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="BedrockAgentAccess",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:ListDataSources",
+                    "bedrock:StartIngestionJob",
+                    "bedrock:GetIngestionJob",
+                ],
+                resources=[
+                    f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/{kb.knowledge_base_id}",
+                    f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/{kb.knowledge_base_id}/*"
+                ]
+            )
+        )
+
+        # CloudWatch Logs permissions
+        scraper_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "service-role/AWSLambdaBasicExecutionRole"
+            )
+        )
+
+        # ======================================================================
+        # SCRAPER LAMBDA FUNCTION
+        # ======================================================================
+        scraper_lambda = _lambda.Function(
+            self,
+            "ScraperLambda",
+            function_name="ourjourney-scraper-sync",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="lambda_function.lambda_handler",
+            code=_lambda.Code.from_asset("./lambdas/scraper_lambda"),
+            role=scraper_role,
+            timeout=Duration.minutes(15),  # Maximum timeout for scraping and ingestion
+            memory_size=512,  # Extra memory for faster processing
+            layers=[scraper_layer],
+            environment={
+                "DOC_BUCKET_NAME": doc_bucket.bucket_name,
+                "KNOWLEDGE_BASE_ID": kb.knowledge_base_id
+            },
+            description="Scrapes OurJourney website and syncs Knowledge Base"
+        )
+
+        # ======================================================================
+        # CUSTOM RESOURCE FOR INITIAL SCRAPE
+        # ======================================================================
+        # Custom resource to trigger initial scrape on stack creation
+        scraper_custom_resource = CustomResource(
+            self,
+            "ScraperCustomResource",
+            service_token=scraper_lambda.function_arn,
+            properties={
+                "Trigger": "StackDeploy"
+            }
+        )
+
+        # Ensure custom resource runs after knowledge base is created
+        scraper_custom_resource.node.add_dependency(kb)
+        scraper_custom_resource.node.add_dependency(doc_bucket)
+
+        # ======================================================================
+        # EVENTBRIDGE RULE FOR WEEKLY SCRAPING
+        # ======================================================================
+        # Schedule: Every Sunday at midnight EST (5 AM UTC)
+        scraper_schedule_rule = events.Rule(
+            self,
+            "ScraperScheduleRule",
+            rule_name="ourjourney-weekly-scraper",
+            description="Weekly web scraping and Knowledge Base sync for OurJourney",
+            schedule=events.Schedule.cron(
+                minute="0",
+                hour="5",  # 5 AM UTC = midnight EST
+                week_day="SUN"
+            ),
+        )
+
+        # Add Lambda as target
+        scraper_schedule_rule.add_target(
+            targets.LambdaFunction(scraper_lambda)
+        )
+
         CfnOutput(self, "websocket-url",
             value = web_socket_api.api_endpoint,
         )
@@ -115,4 +239,12 @@ class OurJourneyStack(Stack):
             value = kb.knowledge_base_id,
         )
 
-        
+        CfnOutput(self, "scraper-lambda-arn",
+            value = scraper_lambda.function_arn,
+            description="ARN of the scraper Lambda function"
+        )
+
+        CfnOutput(self, "scraper-schedule-rule",
+            value = scraper_schedule_rule.rule_name,
+            description="EventBridge rule for weekly scraping"
+        )

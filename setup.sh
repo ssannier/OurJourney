@@ -9,6 +9,7 @@
 #
 # This script orchestrates the deployment of:
 #   1. Backend Stack (WebSocket API, Lambda, Bedrock Knowledge Base)
+#      - Custom Resource Lambda automatically scrapes website and syncs KB
 #   2. Frontend Build (npm build and zip creation)
 #   3. Frontend Stack (S3, Amplify, Lambda Custom Resource)
 ################################################################################
@@ -30,8 +31,6 @@ FRONTEND_STACK_NAME="OurJourneyFrontendStack"
 BACKEND_DIR="./our-journey"
 FRONTEND_DIR="./our-journey-frontend"
 FRONTEND_BUILD_SCRIPT="./frontend_build.sh"
-BEDROCK_SCRIPT="./bedrock.sh"
-DOCUMENTS_SOURCE_DIR="./our-journey/S3"
 
 # Global variables set during deployment
 WEBSOCKET_URL=""
@@ -236,20 +235,6 @@ run_preflight_checks() {
     fi
     print_substep "frontend_build.sh exists"
     
-    # Check if bedrock script exists
-    if [ ! -f "$BEDROCK_SCRIPT" ]; then
-        print_error "Bedrock script not found: $BEDROCK_SCRIPT"
-        exit 1
-    fi
-    print_substep "bedrock.sh exists"
-    
-    # Check if documents source directory exists
-    if [ ! -d "$DOCUMENTS_SOURCE_DIR" ]; then
-        print_error "Documents source directory not found: $DOCUMENTS_SOURCE_DIR"
-        exit 1
-    fi
-    print_substep "Documents source directory exists"
-    
     print_step "All pre-flight checks passed"
     echo "" >&2
 }
@@ -278,14 +263,14 @@ rollback_deployment() {
     rm -rf "$FRONTEND_DIR/frontend/node_modules" 2>/dev/null || true
     
     # Destroy stacks based on which stage failed
-    if [ "$stage" -ge 4 ]; then
+    if [ "$stage" -ge 3 ]; then
         print_substep "Destroying frontend stack..."
         cd "$FRONTEND_DIR"
         cdk destroy $FRONTEND_STACK_NAME --force --region $AWS_REGION >&2 2>&1 || true
         cd - > /dev/null
     fi
     
-    if [ "$stage" -ge 2 ]; then
+    if [ "$stage" -ge 1 ]; then
         print_substep "Destroying backend stack (includes cleaning S3 buckets)..."
         cd "$BACKEND_DIR"
         cdk destroy $BACKEND_STACK_NAME --force --region $AWS_REGION >&2 2>&1 || true
@@ -301,7 +286,7 @@ rollback_deployment() {
 ################################################################################
 
 deploy_backend() {
-    print_header "[Stage 1/4] Deploying Backend Stack"
+    print_header "[Stage 1/3] Deploying Backend Stack"
     
     cd "$BACKEND_DIR"
     
@@ -386,7 +371,7 @@ deploy_backend() {
 
 build_frontend() {
     local websocket_url=$1
-    print_header "[Stage 3/4] Building Frontend"
+    print_header "[Stage 2/3] Building Frontend"
     
     # Make the frontend build script executable
     chmod +x "$FRONTEND_BUILD_SCRIPT"
@@ -401,35 +386,8 @@ build_frontend() {
     echo "" >&2
 }
 
-prepare_knowledge_base() {
-    print_header "[Stage 2/4] Preparing Knowledge Base"
-    
-    # Validate that required variables are set
-    if [ -z "$KNOWLEDGE_BASE_ID" ]; then
-        print_error "Knowledge Base ID not set (internal error)"
-        rollback_deployment 2
-    fi
-    
-    if [ -z "$DOC_BUCKET_NAME" ]; then
-        print_error "Document Bucket Name not set (internal error)"
-        rollback_deployment 2
-    fi
-    
-    # Make the bedrock script executable
-    chmod +x "$BEDROCK_SCRIPT"
-    
-    # Run the bedrock script
-    if ! "$BEDROCK_SCRIPT" "$KNOWLEDGE_BASE_ID" "$DOC_BUCKET_NAME" "$DOCUMENTS_SOURCE_DIR"; then
-        print_error "Knowledge Base preparation failed"
-        rollback_deployment 2
-    fi
-    
-    print_step "Knowledge Base ready"
-    echo "" >&2
-}
-
 deploy_frontend() {
-    print_header "[Stage 4/4] Deploying Frontend Stack"
+    print_header "[Stage 3/3] Deploying Frontend Stack"
     
     cd "$FRONTEND_DIR"
     
@@ -586,13 +544,13 @@ main() {
                 exit 1
             fi
             
-            # Stage 2: Prepare Knowledge Base (upload docs and sync)
-            prepare_knowledge_base
+            # Note: Knowledge Base is automatically populated by Custom Resource Lambda
+            # during backend deployment (web scraping and sync handled automatically)
             
-            # Stage 3: Build frontend
+            # Stage 2: Build frontend
             build_frontend "$WEBSOCKET_URL"
             
-            # Stage 4: Deploy frontend
+            # Stage 3: Deploy frontend
             deploy_frontend
             
             # Success!

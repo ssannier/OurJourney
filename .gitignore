@@ -15,3 +15,6 @@ our-journey-frontend/build.zip
 our-journey-frontend/.venv/
 our-journey-frontend/frontend/node_modules/
 our-journey-frontend/frontend/dist/
+
+#ignore todo file
+todo.md

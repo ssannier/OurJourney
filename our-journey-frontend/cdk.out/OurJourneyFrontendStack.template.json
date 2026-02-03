@@ -65,7 +65,7 @@
     "UserPoolAddOns": {
      "AdvancedSecurityMode": "ENFORCED"
     },
-    "UserPoolName": "our-journey-user-pool-64565105",
+    "UserPoolName": "our-journey-user-pool-4d980653",
     "UsernameAttributes": [
      "email"
     ],
@@ -85,7 +85,7 @@
   "OurJourneyUserPoolOurJourneyCognitoDomainA567F322": {
    "Type": "AWS::Cognito::UserPoolDomain",
    "Properties": {
-    "Domain": "our-journey-app-64565105",
+    "Domain": "our-journey-app-4d980653",
     "UserPoolId": {
      "Ref": "OurJourneyUserPoolE1EB8C0A"
     }
@@ -152,7 +152,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-post-confirmation-role-64565105"
+    "RoleName": "our-journey-post-confirmation-role-4d980653"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/PostConfirmationLambdaRole/Resource"
@@ -201,7 +201,7 @@
       "DEFAULT_GROUP": "Users"
      }
     },
-    "FunctionName": "our-journey-post-confirmation-64565105",
+    "FunctionName": "our-journey-post-confirmation-4d980653",
     "Handler": "post_confirmation_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -291,7 +291,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-admin-creator-role-64565105"
+    "RoleName": "our-journey-admin-creator-role-4d980653"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AdminCreatorLambdaRole/Resource"
@@ -337,7 +337,7 @@
      "S3Key": "c5bfbe70e9a927367df2a07a707e5d8ee2bcc77cfc385f5e5e03d90788b4e53c.zip"
     },
     "Description": "Creates default admin user on stack creation",
-    "FunctionName": "our-journey-admin-creator-64565105",
+    "FunctionName": "our-journey-admin-creator-4d980653",
     "Handler": "create_admin_user_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -549,8 +549,8 @@
     "UserPoolId": {
      "Ref": "OurJourneyUserPoolE1EB8C0A"
     },
-    "AdminEmail": "admin@ourjourney.local",
-    "AdminPassword": "AdminPassword123!",
+    "AdminEmail": "matthew.brummund@gmail.com",
+    "AdminPassword": "N@wY@rk321",
     "AdminGroup": "Admins"
    },
    "DependsOn": [
@@ -580,7 +580,7 @@
      "http://localhost:5173",
      "https://example.com"
     ],
-    "ClientName": "our-journey-app-client-64565105",
+    "ClientName": "our-journey-app-client-4d980653",
     "EnableTokenRevocation": true,
     "ExplicitAuthFlows": [
      "ALLOW_USER_PASSWORD_AUTH",
@@ -632,7 +632,7 @@
       }
      ]
     },
-    "BucketName": "our-journey-frontend-store-64565105",
+    "BucketName": "our-journey-frontend-store-4d980653",
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
      "BlockPublicPolicy": true,
@@ -896,7 +896,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/c39605c4b42ab56ceb6c9ee5e09378e1f37f7cb06f8c2d806dcb03a7f2faaf70.zip\",\"Bucket\":\"",
+       "/3015657b0f11728795bbe4acd5d5ff0e6757fe4c7da5b07a7f5fce651b402195.zip\",\"Bucket\":\"",
        {
         "Ref": "FrontendStoreBucketC891F5ED"
        },
@@ -947,7 +947,7 @@
           {
            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "/c39605c4b42ab56ceb6c9ee5e09378e1f37f7cb06f8c2d806dcb03a7f2faaf70.zip"
+          "/3015657b0f11728795bbe4acd5d5ff0e6757fe4c7da5b07a7f5fce651b402195.zip"
          ]
         ]
        }
@@ -1102,7 +1102,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-amplify-lambda-role-64565105"
+    "RoleName": "our-journey-amplify-lambda-role-4d980653"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AmplifyDeploymentLambdaRole/Resource"
@@ -1207,7 +1207,7 @@
        "Ref": "FrontendStoreBucketC891F5ED"
       },
       "FRONTEND_FOLDER_NAME": "/build/",
-      "AMPLIFY_APP_NAME": "OurJourneyApp-64565105",
+      "AMPLIFY_APP_NAME": "OurJourneyApp-4d980653",
       "USER_POOL_ID": {
        "Ref": "OurJourneyUserPoolE1EB8C0A"
       },
@@ -1234,7 +1234,7 @@
       }
      }
     },
-    "FunctionName": "our-journey-amplify-deployment-64565105",
+    "FunctionName": "our-journey-amplify-deployment-4d980653",
     "Handler": "lambda_function.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -1551,7 +1551,7 @@
   },
   "DefaultAdminCredentials": {
    "Description": "⚠️  Default admin credentials - CHANGE PASSWORD IMMEDIATELY after first login!",
-   "Value": "Email: admin@ourjourney.local | Password: AdminPassword123!"
+   "Value": "Email: matthew.brummund@gmail.com | Password: N@wY@rk321"
   }
  },
  "Conditions": {
