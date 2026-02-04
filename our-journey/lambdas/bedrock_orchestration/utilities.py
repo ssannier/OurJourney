@@ -59,6 +59,10 @@ def send_to_gateway(connectionId, json_data):
 def converse_with_model(modelId, chatHistory, config=None, system=None, streaming=False):
     """Get response from Bedrock AI model with optional streaming"""
     logger.info(f"Conversing with model: {modelId}, streaming: {streaming}")
+
+    guardrails_streaming = constants.GUARDRAILS_CONFIG_STREAMING
+
+    guardrails = constants.GUARDRAILS_CONFIG
     
     try:
         if streaming:
@@ -66,14 +70,16 @@ def converse_with_model(modelId, chatHistory, config=None, system=None, streamin
                 modelId=modelId,
                 messages=chatHistory,
                 inferenceConfig=config,
-                system=system
+                system=system,
+                guardrailConfig=guardrails_streaming
             )
         else:
             response = bedrock.converse(
                 modelId=modelId,
                 messages=chatHistory,
                 inferenceConfig=config,
-                system=system
+                system=system,
+                guardrailConfig=guardrails
             )
         
         logger.info("Model conversation completed")

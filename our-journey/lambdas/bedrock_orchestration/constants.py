@@ -37,3 +37,24 @@ if not KNOWLEDGE_BASE_ID:
 NUM_KB_RESULTS = os.environ.get("NUM_KB_RESULTS")
 if not NUM_KB_RESULTS:
     raise ValueError("NUM_KB_RESULTS environment variable is required")
+
+GUARDRAIL_ID = os.environ.get("GUARDRAIL_ID")
+if not GUARDRAIL_ID:
+    raise ValueError("GUARDRAIL_ID environment variable is required")
+
+GUARDRAIL_VERSION = os.environ.get("GUARDRAIL_VERSION")
+if not GUARDRAIL_VERSION:
+    raise ValueError("GUARDRAIL_VERSION environment variable is required")
+
+GUARDRAILS_CONFIG_STREAMING = {
+        'guardrailIdentifier': GUARDRAIL_ID,
+        'guardrailVersion': GUARDRAIL_VERSION,
+        'trace': 'disabled',
+        'streamProcessingMode': 'sync'
+    }
+
+GUARDRAILS_CONFIG = {
+        'guardrailIdentifier': GUARDRAIL_ID,
+        'guardrailVersion': GUARDRAIL_VERSION,
+        'trace': 'disabled'
+    }

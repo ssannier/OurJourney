@@ -55,6 +55,70 @@ class OurJourneyStack(Stack):
             data_deletion_policy=bedrock.DataDeletionPolicy.RETAIN
         )
 
+        # Create bedrock guardrails
+        guardrail = bedrock.Guardrail(
+            self,
+            "guardrail",
+            name=f"our-journey-guardrail-{self.stack_name}",
+            blocked_input_messaging="Your request cannot be processed as it violates our content policies. (Su solicitud no puede ser procesada ya que viola nuestras políticas de contenido.)",
+            blocked_outputs_messaging="Your request cannot be processed as it violates our content policies. (Su solicitud no puede ser procesada ya que viola nuestras políticas de contenido.)",
+            content_filters=[
+                bedrock.ContentFilter(
+                    input_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    output_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    type=bedrock.ContentFilterType.SEXUAL,
+                    input_action=bedrock.GuardrailAction.BLOCK,
+                    input_enabled=True,
+                    output_action=bedrock.GuardrailAction.BLOCK,
+                    output_enabled=True
+                ),
+                bedrock.ContentFilter(
+                    input_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    output_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    type=bedrock.ContentFilterType.VIOLENCE,
+                    input_action=bedrock.GuardrailAction.BLOCK,
+                    input_enabled=True,
+                    output_action=bedrock.GuardrailAction.BLOCK,
+                    output_enabled=True
+                ),
+                bedrock.ContentFilter(
+                    input_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    output_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    type=bedrock.ContentFilterType.HATE,
+                    input_action=bedrock.GuardrailAction.BLOCK,
+                    input_enabled=True,
+                    output_action=bedrock.GuardrailAction.BLOCK,
+                    output_enabled=True
+                ),
+                bedrock.ContentFilter(
+                    input_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    output_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    type=bedrock.ContentFilterType.INSULTS,
+                    input_action=bedrock.GuardrailAction.BLOCK,
+                    input_enabled=True,
+                    output_action=bedrock.GuardrailAction.BLOCK,
+                    output_enabled=True
+                ),
+                bedrock.ContentFilter(
+                    input_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    output_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    type=bedrock.ContentFilterType.MISCONDUCT,
+                    input_action=bedrock.GuardrailAction.BLOCK,
+                    input_enabled=True,
+                    output_action=bedrock.GuardrailAction.BLOCK,
+                    output_enabled=True
+                ),
+                bedrock.ContentFilter(
+                    input_strength=bedrock.ContentFilterStrength.MEDIUM,
+                    output_strength=bedrock.ContentFilterStrength.NONE,
+                    type=bedrock.ContentFilterType.PROMPT_ATTACK,
+                    input_action=bedrock.GuardrailAction.BLOCK,
+                    input_enabled=True,
+                )
+            ]
+        )
+
+
         # Create a WebSocket API
         web_socket_api = apigwv2.WebSocketApi(self, "web_socket_api",)
         apigwv2.WebSocketStage(
@@ -79,6 +143,8 @@ class OurJourneyStack(Stack):
                 "API_GATEWAY_URL": web_socket_api.api_endpoint,
                 "KNOWLEDGE_BASE_ID": kb.knowledge_base_id,
                 "NUM_KB_RESULTS": "5",
+                "GUARDRAIL_ID": guardrail.guardrail_id,
+                "GUARDRAIL_VERSION": guardrail.guardrail_version,
             }
         )
 
