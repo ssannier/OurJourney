@@ -288,9 +288,7 @@ def deploy_to_amplify(app_id, branch_name):
     logger.info(f"Starting deployment for app {app_id}, branch {branch_name}")
     
     try:
-        # Ensure FRONTEND_FOLDER_NAME has trailing slash for Amplify (required)
-        folder_with_slash = FRONTEND_FOLDER_NAME if FRONTEND_FOLDER_NAME.endswith('/') else f"{FRONTEND_FOLDER_NAME}/"
-        source_url = f"s3://{FRONTEND_BUCKET_NAME}/{folder_with_slash}"
+        source_url = f"s3://{FRONTEND_BUCKET_NAME}/{FRONTEND_FOLDER_NAME}"
         logger.info(f"S3 source URL: {source_url}")
         
         response = amplify.start_deployment(

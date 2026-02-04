@@ -564,7 +564,7 @@ class OurJourneyFrontendStack(Stack):
             environment={
                 # Original environment variables
                 "FRONTEND_BUCKET_NAME": frontend_bucket.bucket_name,
-                "FRONTEND_FOLDER_NAME": "/build/",
+                "FRONTEND_FOLDER_NAME": "build/",
                 "AMPLIFY_APP_NAME": f"OurJourneyApp-{self.suffix}",
                 # New Cognito environment variables
                 "USER_POOL_ID": user_pool.user_pool_id,

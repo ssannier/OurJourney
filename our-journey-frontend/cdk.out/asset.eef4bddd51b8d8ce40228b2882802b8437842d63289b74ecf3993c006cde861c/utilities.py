@@ -288,9 +288,7 @@ def deploy_to_amplify(app_id, branch_name):
     logger.info(f"Starting deployment for app {app_id}, branch {branch_name}")
     
     try:
-        # Ensure FRONTEND_FOLDER_NAME has trailing slash for Amplify (required)
-        folder_with_slash = FRONTEND_FOLDER_NAME if FRONTEND_FOLDER_NAME.endswith('/') else f"{FRONTEND_FOLDER_NAME}/"
-        source_url = f"s3://{FRONTEND_BUCKET_NAME}/{folder_with_slash}"
+        source_url = f"s3://{FRONTEND_BUCKET_NAME}{FRONTEND_FOLDER_NAME}"
         logger.info(f"S3 source URL: {source_url}")
         
         response = amplify.start_deployment(
@@ -311,25 +309,17 @@ def deploy_to_amplify(app_id, branch_name):
         return {"success": False, "message": error_msg}
 
 
+# Add this to your delete_amplify_app function for better debugging:
 def delete_amplify_app(app_id):
-    """
-    Delete Amplify app and all associated resources.
-    
-    Args:
-        app_id (str): Amplify application ID to delete
-        
-    Returns:
-        dict: Response with success status and message
-    """
     logger.info(f"Deleting Amplify app with ID: {app_id}")
     
     try:
-        # First, verify the app exists (for better debugging)
+        # First, verify the app exists
         try:
             get_response = amplify.get_app(appId=app_id)
             logger.info(f"App exists: {get_response['app']['name']}")
         except Exception as get_error:
-            logger.warning(f"Cannot verify app exists: {str(get_error)}")
+            logger.error(f"Cannot get app details: {str(get_error)}")
             # Continue anyway - might still be able to delete
         
         response = amplify.delete_app(appId=app_id)
@@ -341,7 +331,7 @@ def delete_amplify_app(app_id):
     except Exception as e:
         error_msg = f"Error deleting Amplify app: {str(e)}"
         logger.error(error_msg)
-        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error type: {type(e).__name__}")  # ← This will tell you the exact AWS error
         logger.error(f"Full traceback: {traceback.format_exc()}")
         return {"success": False, "message": error_msg}
 

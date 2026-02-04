@@ -173,7 +173,6 @@ class OurJourneyStack(Stack):
         scraper_lambda = _lambda.Function(
             self,
             "ScraperLambda",
-            function_name="ourjourney-scraper-sync",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="lambda_function.lambda_handler",
             code=_lambda.Code.from_asset("./lambdas/scraper_lambda"),

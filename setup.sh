@@ -36,6 +36,7 @@ FRONTEND_BUILD_SCRIPT="./frontend_build.sh"
 WEBSOCKET_URL=""
 KNOWLEDGE_BASE_ID=""
 DOC_BUCKET_NAME=""
+AMPLIFY_APP_URL=""
 
 ################################################################################
 # Utility Functions
@@ -423,7 +424,43 @@ deploy_frontend() {
     fi
     
     print_substep "Admin user created: $ADMIN_EMAIL"
-    print_substep "View your Amplify app URL in the AWS Amplify console"
+    
+    # Get the Amplify app URL with branch name
+    print_substep "Retrieving Amplify app URL..."
+    
+    # Get the app ID of the most recently updated app
+    AMPLIFY_APP_ID=$(aws amplify list-apps \
+        --region $AWS_REGION \
+        --query 'apps | sort_by(@, &updateTime) | [-1].appId' \
+        --output text 2>/dev/null)
+    
+    if [ -n "$AMPLIFY_APP_ID" ]; then
+        # Get the default domain and branch name
+        AMPLIFY_DOMAIN=$(aws amplify get-app \
+            --app-id "$AMPLIFY_APP_ID" \
+            --region $AWS_REGION \
+            --query 'app.defaultDomain' \
+            --output text 2>/dev/null)
+        
+        # Get the production branch name (should be "prod" based on your config)
+        AMPLIFY_BRANCH=$(aws amplify list-branches \
+            --app-id "$AMPLIFY_APP_ID" \
+            --region $AWS_REGION \
+            --query 'branches[?stage==`PRODUCTION`].branchName | [0]' \
+            --output text 2>/dev/null)
+        
+        if [ -n "$AMPLIFY_DOMAIN" ] && [ -n "$AMPLIFY_BRANCH" ]; then
+            # Construct the full URL: https://[branch].[domain]
+            AMPLIFY_APP_URL="https://${AMPLIFY_BRANCH}.${AMPLIFY_DOMAIN}"
+            print_substep "Amplify app URL: $AMPLIFY_APP_URL"
+        else
+            print_warning "Could not retrieve Amplify app URL automatically"
+            print_substep "View your Amplify app URL in the AWS Amplify console"
+        fi
+    else
+        print_warning "Could not retrieve Amplify app URL automatically"
+        print_substep "View your Amplify app URL in the AWS Amplify console"
+    fi
     
     print_step "Frontend stack deployed successfully"
     echo "" >&2
@@ -561,6 +598,12 @@ main() {
             echo "  • WebSocket API: $WEBSOCKET_URL" >&2
             echo "  • Knowledge Base ID: $KNOWLEDGE_BASE_ID" >&2
             echo "  • Document Bucket: $DOC_BUCKET_NAME" >&2
+            
+            # Display Amplify URL if retrieved
+            if [ -n "$AMPLIFY_APP_URL" ]; then
+                echo "  • Amplify App URL: $AMPLIFY_APP_URL" >&2
+            fi
+            
             echo "  • Amplify Console: https://console.aws.amazon.com/amplify/home?region=$AWS_REGION" >&2
             echo "" >&2
             echo "Admin Credentials:" >&2
@@ -568,10 +611,20 @@ main() {
             echo "  • Password: [hidden - you entered this during setup]" >&2
             echo "" >&2
             echo "Next steps:" >&2
-            echo "  1. Visit your Amplify app URL above to access the application" >&2
-            echo "  2. Sign in with the admin credentials" >&2
-            echo "  3. You will be redirected to the admin dashboard at /admin" >&2
-            echo "  4. Change your admin password after first login!" >&2
+            
+            # Conditional next steps based on whether URL was retrieved
+            if [ -n "$AMPLIFY_APP_URL" ]; then
+                echo "  1. Visit your Amplify app at: $AMPLIFY_APP_URL" >&2
+                echo "  2. Sign in with the admin credentials above" >&2
+                echo "  3. You will be redirected to the admin dashboard at /admin" >&2
+                echo "  4. Change your admin password after first login!" >&2
+            else
+                echo "  1. Visit the Amplify console link above to find your app URL" >&2
+                echo "  2. Sign in with the admin credentials above" >&2
+                echo "  3. You will be redirected to the admin dashboard at /admin" >&2
+                echo "  4. Change your admin password after first login!" >&2
+            fi
+            
             echo "" >&2
             ;;
             

@@ -67,9 +67,6 @@ FRONTEND_FOLDER_NAME = os.environ.get("FRONTEND_FOLDER_NAME")
 if not FRONTEND_FOLDER_NAME:
     raise ValueError("FRONTEND_FOLDER_NAME environment variable is required")
 
-# Normalize the folder name - remove leading/trailing slashes for S3 best practices
-FRONTEND_FOLDER_NAME = FRONTEND_FOLDER_NAME.strip('/')
-
 # ============================================================================
 # ENVIRONMENT VARIABLE VALIDATION - COGNITO
 # ============================================================================
@@ -143,11 +140,11 @@ S3_DELETE_BATCH_SIZE = 1000
 
 # App ID storage configuration
 APP_ID_FILE_NAME = "amplify-app-id.txt"
-APP_ID_FILE_KEY = f"{FRONTEND_FOLDER_NAME}/{APP_ID_FILE_NAME}"
+APP_ID_FILE_KEY = f"{FRONTEND_FOLDER_NAME.rstrip('/')}/{APP_ID_FILE_NAME}"
 
 # Cognito configuration storage
 COGNITO_CONFIG_FILE_NAME = "cognito-config.json"
-COGNITO_CONFIG_FILE_KEY = f"{FRONTEND_FOLDER_NAME}/{COGNITO_CONFIG_FILE_NAME}"
+COGNITO_CONFIG_FILE_KEY = f"{FRONTEND_FOLDER_NAME.rstrip('/')}/{COGNITO_CONFIG_FILE_NAME}"
 
 # ============================================================================
 # COGNITO CONFIGURATION CONSTANTS
