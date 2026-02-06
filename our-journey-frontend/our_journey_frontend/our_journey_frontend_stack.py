@@ -596,8 +596,7 @@ class OurJourneyFrontendStack(Stack):
         )
         
         # Ensure Custom Resource waits for build.zip to be copied to S3
-        amplify_custom_resource.node.add_dependency(copy_build_zip)
-        
+        amplify_custom_resource.node.add_dependency(copy_build_zip)        
         # ======================================================================
         # 12. STACK OUTPUTS
         # ======================================================================

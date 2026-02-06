@@ -94,17 +94,58 @@ def converse_with_model(modelId, chatHistory, config=None, system=None, streamin
         raise
 
 
+# Function to converse with Bedrock AI model WITHOUT guardrails
+# Used for internal analysis tasks like follow-up detection
+def converse_with_model_no_guardrails(modelId, chatHistory, config=None, system=None, streaming=False):
+    """Get response from Bedrock AI model WITHOUT guardrails - for internal analysis only"""
+    logger.info(f"Conversing with model (no guardrails): {modelId}, streaming: {streaming}")
+    
+    try:
+        # Build parameters - only include system if it's not None
+        api_params = {
+            'modelId': modelId,
+            'messages': chatHistory
+        }
+        
+        if config:
+            api_params['inferenceConfig'] = config
+        
+        if system:
+            api_params['system'] = system
+        
+        # Call appropriate API
+        if streaming:
+            response = bedrock.converse_stream(**api_params)
+        else:
+            response = bedrock.converse(**api_params)
+        
+        logger.info("Model conversation (no guardrails) completed")
+        return response
+        
+    except ClientError as e:
+        logger.error(f"Bedrock client error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Model conversation failed: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
+        raise
+
+
 # Function to parse streaming response and send events to client 
 # Classic is when the response is not streaming just one whole string message
 # Pure is when the response is a string and not a dict from the model
 # Info is an update for the frontend from before the final response is made (Info messages never stream, and are always sent as a single message)
-def parse_and_send_response(response, connectionId, classic=None, pure=None, info=None):
+# capture_text is when we need to capture the full text being streamed for later use (e.g., saving to DB)
+def parse_and_send_response(response, connectionId, classic=None, pure=None, info=None, capture_text=False):
     """Parse streaming response and send events to client in real-time"""
     logger.info("Parsing and sending response")
     
     # Initialize buffer for BREAK_TOKEN detection
     buffer = ""
     BREAK_TOKEN = "BREAK_TOKEN"
+    
+    # Initialize text capture if requested
+    captured_text = "" if capture_text else None
     
     try:
 
@@ -143,6 +184,11 @@ def parse_and_send_response(response, connectionId, classic=None, pure=None, inf
                 if "contentBlockDelta" in event:
                     contentBlockDelta = event["contentBlockDelta"]
                     delta_text = contentBlockDelta.get("delta", {}).get("text", "")
+                    
+                    # Capture text if requested (excluding BREAK_TOKEN)
+                    if capture_text and delta_text:
+                        # Don't include BREAK_TOKEN in captured text
+                        captured_text += delta_text.replace(BREAK_TOKEN, "")
                     
                     # Process BREAK_TOKEN detection
                     if buffer == "":
@@ -327,6 +373,12 @@ def parse_and_send_response(response, connectionId, classic=None, pure=None, inf
         logger.error(f"Response parsing failed: {e}")
         logger.debug(f"Traceback: {traceback.format_exc()}")
         raise
+    
+    # Return captured text if requested
+    if capture_text:
+        logger.info(f"Captured text length: {len(captured_text)}")
+        return captured_text
+    return None
 
 
 # Function to create a formatted conversation history for AI model input
@@ -414,4 +466,3 @@ def extract_json_content(text):
         return text[first_brace:last_brace + 1]
     
     return ""
-    

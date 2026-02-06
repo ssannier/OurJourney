@@ -7,10 +7,79 @@ class WebSocketManager {
     this.isConnecting = false;
     this.messageCallback = null;
     this.infoCallback = null; // For temporary info messages
-    this.completionCallback = null; // NEW: For when message is complete
+    this.completionCallback = null; // For when message is complete
     this.currentMessage = ''; // Track the current streaming message
     this.hasContent = false; // Track if current message has content for break token validation
     this.shouldCreateNewMessage = false; // Track if next delta should create new message
+    this.conversationId = null; // Track the current conversation ID
+  }
+
+  // Generate a new conversation ID
+  generateConversationId() {
+    // Generate UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    return 'conv_' + 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // Start a new conversation (generates new ID)
+  startNewConversation() {
+    this.conversationId = this.generateConversationId();
+    console.log('Started new conversation:', this.conversationId);
+    
+    // Optionally persist to localStorage for session recovery
+    try {
+      localStorage.setItem('currentConversationId', this.conversationId);
+    } catch (e) {
+      console.warn('Could not save conversationId to localStorage:', e);
+    }
+    
+    return this.conversationId;
+  }
+
+  // Get or create conversation ID
+  getConversationId() {
+    if (!this.conversationId) {
+      // Try to recover from localStorage first
+      try {
+        const stored = localStorage.getItem('currentConversationId');
+        if (stored) {
+          this.conversationId = stored;
+          console.log('Recovered conversation ID from localStorage:', this.conversationId);
+          return this.conversationId;
+        }
+      } catch (e) {
+        console.warn('Could not read conversationId from localStorage:', e);
+      }
+      
+      // Generate new if none exists
+      this.startNewConversation();
+    }
+    return this.conversationId;
+  }
+
+  // Clear current conversation ID (call when starting fresh)
+  clearConversation() {
+    this.conversationId = null;
+    try {
+      localStorage.removeItem('currentConversationId');
+    } catch (e) {
+      console.warn('Could not clear conversationId from localStorage:', e);
+    }
+    console.log('Conversation cleared');
+  }
+
+  // Set a specific conversation ID (for loading existing conversations)
+  setConversationId(conversationId) {
+    this.conversationId = conversationId;
+    try {
+      localStorage.setItem('currentConversationId', conversationId);
+    } catch (e) {
+      console.warn('Could not save conversationId to localStorage:', e);
+    }
+    console.log('Conversation ID set to:', conversationId);
   }
 
   // Connect to WebSocket
@@ -119,7 +188,7 @@ class WebSocketManager {
       // Message is complete, notify completion callback before closing
       console.log('Message stop received, final message:', this.currentMessage);
       
-      // NEW: Notify that message is complete before closing
+      // Notify that message is complete before closing
       if (this.completionCallback) {
         this.completionCallback();
       }
@@ -155,10 +224,14 @@ class WebSocketManager {
         return;
       }
 
+      // Get or generate conversation ID
+      const conversationId = this.getConversationId();
+
       const packet = {
         action: 'sendMessage', // Route name for API Gateway
         message: message,
         messages: messages,
+        conversationId: conversationId, // Include conversation ID
         userInfo: userInfo // Include user info if provided
       };
 
@@ -179,12 +252,12 @@ class WebSocketManager {
       this.ws.close();
       console.log('WebSocket connection closed manually');
     }
-    // Reset all state
+    // Reset message state (but preserve conversationId)
     this.currentMessage = '';
     this.hasContent = false;
     this.shouldCreateNewMessage = false;
-    this.infoCallback = null; // Clear info callback
-    this.completionCallback = null; // NEW: Clear completion callback
+    this.infoCallback = null;
+    this.completionCallback = null;
   }
 
   // Get connection status
@@ -199,7 +272,7 @@ class WebSocketManager {
     try {
       this.messageCallback = onMessageReceived;
       this.infoCallback = onInfoReceived;
-      this.completionCallback = onMessageComplete; // NEW: Store completion callback
+      this.completionCallback = onMessageComplete;
       await this.connect();
       await this.sendMessage(message, messages, userInfo);
       // Connection will be closed automatically when messageStop is received

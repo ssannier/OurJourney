@@ -3,9 +3,11 @@ from aws_cdk import (
     Stack,
     aws_apigatewayv2 as apigwv2,
     aws_apigatewayv2_integrations as apigwv2_i,
+    aws_apigateway as apigw,
     aws_lambda as _lambda,
     aws_iam as iam,
     aws_s3 as s3,
+    aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
     CfnOutput,
@@ -119,6 +121,110 @@ class OurJourneyStack(Stack):
         )
 
 
+        # ======================================================================
+        # DYNAMODB TABLES
+        # ======================================================================
+        
+        # Conversations Table - stores all user conversations with the chatbot
+        conversations_table = dynamodb.Table(
+            self,
+            "ConversationsTable",
+            partition_key=dynamodb.Attribute(
+                name="id",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            point_in_time_recovery=False,
+        )
+
+        # GSI for querying by userId
+        conversations_table.add_global_secondary_index(
+            index_name="UserIdIndex",
+            partition_key=dynamodb.Attribute(
+                name="userId",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+        )
+
+        # GSI for querying by flag status
+        conversations_table.add_global_secondary_index(
+            index_name="FlagIndex",
+            partition_key=dynamodb.Attribute(
+                name="flag",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+        )
+
+        # Follow-Up Queue Table - stores conversations that need follow-up
+        followup_table = dynamodb.Table(
+            self,
+            "FollowUpTable",
+            partition_key=dynamodb.Attribute(
+                name="id",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            point_in_time_recovery=False,
+        )
+
+        # GSI for querying by status
+        followup_table.add_global_secondary_index(
+            index_name="StatusIndex",
+            partition_key=dynamodb.Attribute(
+                name="status",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+        )
+
+        # GSI for querying by priority
+        followup_table.add_global_secondary_index(
+            index_name="PriorityIndex",
+            partition_key=dynamodb.Attribute(
+                name="priority",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+        )
+
+        # GSI for querying by requestType (normal vs crisis)
+        followup_table.add_global_secondary_index(
+            index_name="RequestTypeIndex",
+            partition_key=dynamodb.Attribute(
+                name="requestType",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+        )
+
+
         # Create a WebSocket API
         web_socket_api = apigwv2.WebSocketApi(self, "web_socket_api",)
         apigwv2.WebSocketStage(
@@ -145,6 +251,8 @@ class OurJourneyStack(Stack):
                 "NUM_KB_RESULTS": "5",
                 "GUARDRAIL_ID": guardrail.guardrail_id,
                 "GUARDRAIL_VERSION": guardrail.guardrail_version,
+                "CONVERSATIONS_TABLE": conversations_table.table_name,
+                "FOLLOWUP_TABLE": followup_table.table_name,
             }
         )
 
@@ -154,6 +262,9 @@ class OurJourneyStack(Stack):
         )
         bedrock_orchestration.role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonAPIGatewayInvokeFullAccess")
+        )
+        bedrock_orchestration.role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonDynamoDBFullAccess")
         )
         bedrock_orchestration.add_to_role_policy(
             iam.PolicyStatement(
@@ -291,6 +402,69 @@ class OurJourneyStack(Stack):
             targets.LambdaFunction(scraper_lambda)
         )
 
+        # ======================================================================
+        # ADMIN RETRIEVAL LAMBDA
+        # ======================================================================
+        admin_lambda = _lambda.Function(
+            self,
+            "AdminRetrievalLambda",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="lambda_function.lambda_handler",
+            code=_lambda.Code.from_asset("./lambdas/admin_retrieval"),
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            environment={
+                "CONVERSATIONS_TABLE": conversations_table.table_name,
+                "FOLLOWUP_TABLE": followup_table.table_name,
+            },
+            description="Admin Lambda for retrieving conversation and follow-up data"
+        )
+
+        # Grant DynamoDB full access to admin lambda
+        admin_lambda.role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonDynamoDBFullAccess")
+        )
+
+        # ======================================================================
+        # REST API GATEWAY FOR ADMIN
+        # ======================================================================
+        rest_api = apigw.RestApi(
+            self,
+            "AdminRestApi",
+            rest_api_name="OurJourney Admin API",
+            description="REST API for admin access to conversations and follow-ups",
+            deploy_options=apigw.StageOptions(
+                stage_name="prod"
+            ),
+            default_cors_preflight_options=apigw.CorsOptions(
+                allow_origins=apigw.Cors.ALL_ORIGINS,
+                allow_methods=apigw.Cors.ALL_METHODS,
+                allow_headers=["Content-Type", "Authorization"]
+            )
+        )
+
+        # Lambda integration
+        admin_integration = apigw.LambdaIntegration(
+            admin_lambda,
+            proxy=True
+        )
+
+        # API Routes - Conversations
+        conversations_resource = rest_api.root.add_resource("conversations")
+        conversations_resource.add_method("GET", admin_integration)  # List all conversations
+        
+        conversation_by_id = conversations_resource.add_resource("{id}")
+        conversation_by_id.add_method("GET", admin_integration)  # Get specific conversation
+        conversation_by_id.add_method("PUT", admin_integration)  # Update conversation (e.g., flag status)
+
+        # API Routes - Follow-ups
+        followups_resource = rest_api.root.add_resource("followups")
+        followups_resource.add_method("GET", admin_integration)  # List all follow-ups
+        
+        followup_by_id = followups_resource.add_resource("{id}")
+        followup_by_id.add_method("GET", admin_integration)  # Get specific follow-up
+        followup_by_id.add_method("PUT", admin_integration)  # Update follow-up (status, assignment, notes)
+
         CfnOutput(self, "websocket-url",
             value = web_socket_api.api_endpoint,
         )
@@ -312,4 +486,24 @@ class OurJourneyStack(Stack):
         CfnOutput(self, "scraper-schedule-rule",
             value = scraper_schedule_rule.rule_name,
             description="EventBridge rule for weekly scraping"
+        )
+
+        CfnOutput(self, "conversations-table-name",
+            value = conversations_table.table_name,
+            description="DynamoDB table for conversations"
+        )
+
+        CfnOutput(self, "followup-table-name",
+            value = followup_table.table_name,
+            description="DynamoDB table for follow-up queue"
+        )
+
+        CfnOutput(self, "admin-api-url",
+            value = rest_api.url,
+            description="REST API endpoint for admin operations"
+        )
+
+        CfnOutput(self, "admin-lambda-arn",
+            value = admin_lambda.function_arn,
+            description="ARN of the admin retrieval Lambda function"
         )

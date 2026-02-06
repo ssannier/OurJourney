@@ -1,6 +1,8 @@
 import json
 import logging
 import traceback
+import uuid
+from datetime import datetime
 from chatbot_config import get_prompt, get_config, get_id
 from utilities import (
     converse_with_model,
@@ -8,6 +10,8 @@ from utilities import (
     execute_knowledge_base_query,
     format_results_for_response,
 )
+import dynamodb_utils
+import followup_detector
 import constants  # This configures logging
 
 logger = logging.getLogger(__name__)
@@ -31,15 +35,44 @@ def orchestrate(event):
     
     
     try:
-        # Parse chat history & UserInfo
-        chatHistory = json.loads(event["body"])["messages"]
-        userInfo = json.loads(event["body"])["userInfo"]
+        # Parse request body
+        body = json.loads(event["body"])
+        chatHistory = body.get("messages", [])
+        userInfo = body.get("userInfo", {})
+        
+        # Get or generate conversation ID
+        conversation_id = body.get("conversationId")
+        if not conversation_id:
+            # Generate new conversation ID if not provided
+            conversation_id = f"conv_{uuid.uuid4().hex[:16]}"
+            logger.info(f"Generated new conversation ID: {conversation_id}")
+        else:
+            logger.info(f"Using existing conversation ID: {conversation_id}")
 
         logger.info(f"Parsed {len(chatHistory)} messages")
 
+        # Generate response
         response = respond_to_query(chatHistory=chatHistory, userInfo=userInfo)
-        parse_and_send_response(response, connectionId)
-        logger.info("Answer processed successfully")
+        
+        # Stream the response and capture the full assistant message
+        # parse_and_send_response will be modified to return the captured text
+        assistant_message = parse_and_send_response(response, connectionId, capture_text=True)
+        
+        # Add the assistant's response to chat history if we captured it
+        if assistant_message:
+            chatHistory.append({
+                "role": "assistant",
+                "content": [{"text": assistant_message}]
+            })
+            
+            # Save conversation to DynamoDB
+            save_conversation_to_db(
+                conversation_id=conversation_id,
+                chat_history=chatHistory,
+                user_info=userInfo
+            )
+        
+        logger.info("Answer processed and saved successfully")
               
     except Exception as e:
         logger.error(f"Orchestration failed: {str(e)}")
@@ -169,3 +202,93 @@ def retrieve_answers_from_database(question, userInfo):
     except Exception as e:
         logger.error(f"Database retrieval failed: {e}")
         raise
+
+
+def save_conversation_to_db(conversation_id, chat_history, user_info):
+    """
+    Save the conversation to DynamoDB and analyze for follow-up needs.
+    
+    Args:
+        conversation_id: Unique conversation identifier
+        chat_history: Full list of messages
+        user_info: User information dictionary
+    """
+    logger.info(f"Saving conversation {conversation_id} to DynamoDB")
+    
+    try:
+        # Extract user ID and county
+        user_id = dynamodb_utils.extract_user_id(user_info)
+        county = dynamodb_utils.extract_county(user_info)
+        
+        # Extract categories from conversation
+        categories = dynamodb_utils.extract_categories(chat_history)
+        
+        # Get the last message
+        last_message = ""
+        if chat_history:
+            last_msg = chat_history[-1]
+            content = last_msg.get('content', [])
+            if isinstance(content, list) and content:
+                last_message = content[0].get('text', '')
+            else:
+                last_message = str(content)
+        
+        # Try to get existing conversation to reuse timestamp
+        existing_conversation = dynamodb_utils.get_latest_conversation(conversation_id)
+        
+        if existing_conversation:
+            # Reuse existing timestamp for updates
+            timestamp = existing_conversation['timestamp']
+            logger.info(f"Updating existing conversation with timestamp: {timestamp}")
+        else:
+            # Create new timestamp for first save
+            timestamp = datetime.utcnow().isoformat()
+            logger.info(f"Creating new conversation with timestamp: {timestamp}")
+        
+        # Save to DynamoDB with default flag 'none' initially
+        saved_conversation = dynamodb_utils.save_conversation(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            county=county,
+            messages=chat_history,
+            user_info=user_info,
+            flag='none',  # Default flag, will be updated if follow-up is needed
+            categories=categories,
+            last_message=last_message[:200],  # Truncate to 200 chars for preview
+            timestamp=timestamp  # Pass timestamp to save function
+        )
+        
+        logger.info(f"Conversation {conversation_id} saved successfully")
+        
+        # Get the user's message for follow-up analysis
+        user_message = ""
+        for msg in reversed(chat_history):
+            if msg.get('role') == 'user':
+                content = msg.get('content', [])
+                if isinstance(content, list) and content:
+                    user_message = content[0].get('text', '')
+                else:
+                    user_message = str(content)
+                break
+        
+        # Analyze for follow-up needs
+        if user_message:
+            logger.info("Analyzing conversation for follow-up needs")
+            followup_result = followup_detector.analyze_for_followup(
+                user_message=user_message,
+                user_info=user_info,
+                conversation_id=conversation_id
+            )
+            
+            # Process the follow-up result (update flags, create follow-up records)
+            followup_detector.process_followup_result(
+                followup_result=followup_result,
+                conversation_id=conversation_id,
+                timestamp=timestamp,  # Use the same timestamp
+                user_info=user_info
+            )
+        
+    except Exception as e:
+        logger.error(f"Failed to save conversation to DB: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
+        # Don't raise - we don't want DB errors to break the user experience

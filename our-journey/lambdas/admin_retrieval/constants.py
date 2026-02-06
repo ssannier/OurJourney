@@ -22,29 +22,8 @@ def setup_logging():
 setup_logging()
 
 # ============================================================================
-# CONSTANTS CONFIGURATION
+# DYNAMODB CONFIGURATION
 # ============================================================================
-
-API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL")
-if not API_GATEWAY_URL:
-    raise ValueError("API_GATEWAY_URL environment variable is required")
-
-
-KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
-if not KNOWLEDGE_BASE_ID:
-    raise ValueError("KNOWLEDGE_BASE_ID environment variable is required")
-
-NUM_KB_RESULTS = os.environ.get("NUM_KB_RESULTS")
-if not NUM_KB_RESULTS:
-    raise ValueError("NUM_KB_RESULTS environment variable is required")
-
-GUARDRAIL_ID = os.environ.get("GUARDRAIL_ID")
-if not GUARDRAIL_ID:
-    raise ValueError("GUARDRAIL_ID environment variable is required")
-
-GUARDRAIL_VERSION = os.environ.get("GUARDRAIL_VERSION")
-if not GUARDRAIL_VERSION:
-    raise ValueError("GUARDRAIL_VERSION environment variable is required")
 
 CONVERSATIONS_TABLE = os.environ.get("CONVERSATIONS_TABLE")
 if not CONVERSATIONS_TABLE:
@@ -54,15 +33,28 @@ FOLLOWUP_TABLE = os.environ.get("FOLLOWUP_TABLE")
 if not FOLLOWUP_TABLE:
     raise ValueError("FOLLOWUP_TABLE environment variable is required")
 
-GUARDRAILS_CONFIG_STREAMING = {
-        'guardrailIdentifier': GUARDRAIL_ID,
-        'guardrailVersion': GUARDRAIL_VERSION,
-        'trace': 'disabled',
-        'streamProcessingMode': 'sync'
-    }
+# ============================================================================
+# PAGINATION CONFIGURATION
+# ============================================================================
 
-GUARDRAILS_CONFIG = {
-        'guardrailIdentifier': GUARDRAIL_ID,
-        'guardrailVersion': GUARDRAIL_VERSION,
-        'trace': 'disabled'
-    }
+# Default number of items to return per request
+DEFAULT_LIMIT = 50
+
+# Maximum number of items allowed per request
+MAX_LIMIT = 100
+
+# ============================================================================
+# VALIDATION CONSTANTS
+# ============================================================================
+
+# Valid conversation flag values
+VALID_FLAGS = ['none', 'crisis', 'followup', 'resolved']
+
+# Valid follow-up status values
+VALID_STATUSES = ['new', 'in-progress', 'completed']
+
+# Valid priority values
+VALID_PRIORITIES = ['normal', 'urgent']
+
+# Valid request type values
+VALID_REQUEST_TYPES = ['normal', 'crisis']

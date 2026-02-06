@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Send, Mic } from 'lucide-react';
+import { Menu, Send, Mic, LogOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { signOut } from 'aws-amplify/auth';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
@@ -179,6 +180,15 @@ export const ChatScreen = () => {
     }, 0);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-[#F5F5F5]">
       {/* Header */}
@@ -218,6 +228,16 @@ export const ChatScreen = () => {
                 <h3 className="font-semibold mb-4">Menu</h3>
                 <div className="space-y-2">
                   <button
+                    onClick={() => {
+                      webSocketManager.clearConversation();
+                      navigate('/');
+                      window.location.reload();
+                    }}
+                    className="w-full text-left p-3 hover:bg-gray-100 rounded-lg text-green-600 font-medium"
+                  >
+                    {language === 'en' ? '+ New Conversation' : '+ Nueva Conversación'}
+                  </button>
+                  <button
                     onClick={() => navigate('/categories')}
                     className="w-full text-left p-3 hover:bg-gray-100 rounded-lg"
                   >
@@ -243,6 +263,13 @@ export const ChatScreen = () => {
                     className="w-full text-left p-3 hover:bg-gray-100 rounded-lg text-blue-600"
                   >
                     Admin Dashboard
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left p-3 hover:bg-gray-100 rounded-lg text-red-600 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {language === 'en' ? 'Sign Out' : 'Cerrar Sesión'}
                   </button>
                 </div>
               </div>

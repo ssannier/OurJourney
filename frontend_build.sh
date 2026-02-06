@@ -4,10 +4,10 @@
 # Frontend Build Script
 # 
 # Usage:
-#   ./frontend_build.sh <WEBSOCKET_URL>
+#   ./frontend_build.sh <WEBSOCKET_URL> <REST_API_URL>
 #
 # This script:
-#   1. Updates constants.jsx with the WebSocket URL
+#   1. Updates constants.jsx with the WebSocket URL and REST API URL
 #   2. Installs npm dependencies
 #   3. Builds the frontend application
 #   4. Creates build.zip from the dist/ folder
@@ -86,10 +86,13 @@ rollback() {
 ################################################################################
 
 main() {
-    # Check if WebSocket URL is provided
-    if [ $# -eq 0 ]; then
-        print_error "WebSocket URL not provided"
-        echo "Usage: $0 <WEBSOCKET_URL>" >&2
+    # Check if both URLs are provided
+    if [ $# -lt 2 ]; then
+        print_error "WebSocket URL and REST API URL not provided"
+        echo "Usage: $0 <WEBSOCKET_URL> <REST_API_URL>" >&2
+        echo "" >&2
+        echo "Example:" >&2
+        echo "  $0 wss://abc123.execute-api.us-east-1.amazonaws.com/prod https://xyz789.execute-api.us-east-1.amazonaws.com/prod" >&2
         exit 1
     fi
     
@@ -97,6 +100,7 @@ main() {
     ORIGINAL_DIR="$(pwd)"
     
     WEBSOCKET_URL=$1
+    REST_API_URL=$2
     
     # Verify backup file exists
     if [ ! -f "$CONSTANTS_BACKUP" ]; then
@@ -105,8 +109,8 @@ main() {
     fi
     print_substep "Verified constants_backup.jsx exists"
     
-    # Step 1: Restore constants file from backup and update with endpoint
-    print_substep "Updating constants.jsx with WebSocket endpoint..."
+    # Step 1: Restore constants file from backup and update with endpoints
+    print_substep "Updating constants.jsx with API endpoints..."
     
     # Copy backup to constants file
     if ! cp "$CONSTANTS_BACKUP" "$CONSTANTS_FILE"; then
@@ -114,22 +118,36 @@ main() {
         rollback
     fi
     
-    # Replace the token with the actual endpoint
+    # Replace the WebSocket URL token
     # Using perl for cross-platform compatibility (works on Mac and Linux)
     if command -v perl &> /dev/null; then
-        if ! perl -pi -e "s|\"REPLACE_TOKEN\"|\"$WEBSOCKET_URL\"|g" "$CONSTANTS_FILE"; then
+        if ! perl -pi -e "s|\"WEBSOCKET_REPLACE_TOKEN\"|\"$WEBSOCKET_URL\"|g" "$CONSTANTS_FILE"; then
             print_error "Failed to update WebSocket URL in constants.jsx"
+            rollback
+        fi
+        
+        # Replace the REST API URL token
+        if ! perl -pi -e "s|\"REST_API_REPLACE_TOKEN\"|\"$REST_API_URL\"|g" "$CONSTANTS_FILE"; then
+            print_error "Failed to update REST API URL in constants.jsx"
             rollback
         fi
     else
         # Fallback to sed if perl is not available
-        if ! sed -i.tmp "s|\"REPLACE_TOKEN\"|\"$WEBSOCKET_URL\"|g" "$CONSTANTS_FILE"; then
+        if ! sed -i.tmp "s|\"WEBSOCKET_REPLACE_TOKEN\"|\"$WEBSOCKET_URL\"|g" "$CONSTANTS_FILE"; then
             print_error "Failed to update WebSocket URL in constants.jsx"
             rollback
         fi
+        
+        if ! sed -i.tmp "s|\"REST_API_REPLACE_TOKEN\"|\"$REST_API_URL\"|g" "$CONSTANTS_FILE"; then
+            print_error "Failed to update REST API URL in constants.jsx"
+            rollback
+        fi
+        
         rm -f "$CONSTANTS_FILE.tmp" 2>/dev/null || true
     fi
     
+    print_substep "WebSocket URL: $WEBSOCKET_URL"
+    print_substep "REST API URL: $REST_API_URL"
     print_substep "Constants file updated successfully"
     
     # Step 2: Install dependencies

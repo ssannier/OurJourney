@@ -34,6 +34,7 @@ FRONTEND_BUILD_SCRIPT="./frontend_build.sh"
 
 # Global variables set during deployment
 WEBSOCKET_URL=""
+REST_API_URL=""
 KNOWLEDGE_BASE_ID=""
 DOC_BUCKET_NAME=""
 AMPLIFY_APP_URL=""
@@ -363,6 +364,22 @@ deploy_backend() {
     
     print_substep "Document Bucket Name: $DOC_BUCKET_NAME"
     
+    # Get REST API URL from stack outputs
+    print_substep "Retrieving REST API URL from stack outputs..."
+    REST_API_URL=$(aws cloudformation describe-stacks \
+        --stack-name $BACKEND_STACK_NAME \
+        --region $AWS_REGION \
+        --query 'Stacks[0].Outputs[?OutputKey==`adminapiurl`].OutputValue' \
+        --output text)
+    
+    if [ -z "$REST_API_URL" ]; then
+        print_error "Failed to retrieve REST API URL from stack outputs"
+        cd - > /dev/null
+        rollback_deployment 1
+    fi
+    
+    print_substep "REST API URL: $REST_API_URL"
+    
     print_step "Backend stack deployed successfully"
     echo "" >&2
     
@@ -372,13 +389,14 @@ deploy_backend() {
 
 build_frontend() {
     local websocket_url=$1
+    local rest_api_url=$2
     print_header "[Stage 2/3] Building Frontend"
     
     # Make the frontend build script executable
     chmod +x "$FRONTEND_BUILD_SCRIPT"
     
-    # Run the frontend build script
-    if ! "$FRONTEND_BUILD_SCRIPT" "$websocket_url"; then
+    # Run the frontend build script with both URLs
+    if ! "$FRONTEND_BUILD_SCRIPT" "$websocket_url" "$rest_api_url"; then
         print_error "Frontend build failed"
         rollback_deployment 3
     fi
@@ -572,6 +590,10 @@ main() {
                 print_error "Failed to retrieve WebSocket URL from backend deployment"
                 exit 1
             fi
+            if [ -z "$REST_API_URL" ]; then
+                print_error "Failed to retrieve REST API URL from backend deployment"
+                exit 1
+            fi
             if [ -z "$KNOWLEDGE_BASE_ID" ]; then
                 print_error "Failed to retrieve Knowledge Base ID from backend deployment"
                 exit 1
@@ -585,7 +607,7 @@ main() {
             # during backend deployment (web scraping and sync handled automatically)
             
             # Stage 2: Build frontend
-            build_frontend "$WEBSOCKET_URL"
+            build_frontend "$WEBSOCKET_URL" "$REST_API_URL"
             
             # Stage 3: Deploy frontend
             deploy_frontend
@@ -596,6 +618,7 @@ main() {
             echo "" >&2
             echo "Deployment Details:" >&2
             echo "  • WebSocket API: $WEBSOCKET_URL" >&2
+            echo "  • REST API URL: $REST_API_URL" >&2
             echo "  • Knowledge Base ID: $KNOWLEDGE_BASE_ID" >&2
             echo "  • Document Bucket: $DOC_BUCKET_NAME" >&2
             
