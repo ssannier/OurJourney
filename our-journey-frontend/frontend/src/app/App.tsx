@@ -9,7 +9,6 @@ import { CrisisScreen } from './components/CrisisScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ConversationsView } from './components/admin/ConversationsView';
-import { FollowUpQueue } from './components/admin/FollowUpQueue';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 
@@ -97,7 +96,6 @@ export default function App() {
               {/* Nested Admin Routes */}
               <Route index element={<Navigate to="/admin/conversations" replace />} />
               <Route path="conversations" element={<ConversationsView />} />
-              <Route path="followup" element={<FollowUpQueue />} />
             </Route>
 
             {/* Catch-All Route - Redirect to Welcome */}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Menu, Send, Mic, LogOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { signOut } from 'aws-amplify/auth';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -23,6 +24,13 @@ export const ChatScreen = () => {
   const [currentInfoMessage, setCurrentInfoMessage] = useState(null);
   const [currentAssistantMessageId, setCurrentAssistantMessageId] = useState(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to convert literal \n strings to actual newlines
+  const unescapeNewlines = (text: string) => {
+    // Single replace to convert all escaped newlines to real ones
+    // This preserves \n\n as paragraph breaks and \n as line breaks
+    return text.replace(/\\n/g, '\n');
+  };
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -290,8 +298,8 @@ export const ChatScreen = () => {
                 <div className="flex-1">
                   <div className="bg-[#E8F5E9] rounded-2xl rounded-tl-none p-4 max-w-[80%]">
                     <div className="prose prose-sm max-w-none text-gray-800 prose-headings:text-gray-900 prose-p:text-gray-800 prose-a:text-[#1B5E20] prose-strong:text-gray-900 prose-code:text-gray-800 prose-pre:bg-gray-100 prose-li:text-gray-800">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {message.text}
+                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                        {unescapeNewlines(message.text)}
                       </ReactMarkdown>
                     </div>
                   </div>
@@ -323,8 +331,8 @@ export const ChatScreen = () => {
               <div className="flex justify-end">
                 <div className="bg-white rounded-2xl rounded-tr-none p-4 max-w-[80%] shadow-sm border border-gray-200">
                   <div className="prose prose-sm max-w-none text-gray-800 prose-headings:text-gray-900 prose-p:text-gray-800 prose-a:text-[#1B5E20] prose-strong:text-gray-900 prose-code:text-gray-800 prose-pre:bg-gray-100 prose-li:text-gray-800">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.text}
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {unescapeNewlines(message.text)}
                     </ReactMarkdown>
                   </div>
                 </div>

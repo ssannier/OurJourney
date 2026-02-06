@@ -17,6 +17,37 @@ import constants  # This configures logging
 logger = logging.getLogger(__name__)
 
 
+def apply_default_user_info(user_info):
+    """
+    Apply default values to userInfo fields if they are missing or empty.
+    
+    Args:
+        user_info: Dictionary containing user information
+        
+    Returns:
+        Dictionary with defaults applied for missing fields
+    """
+    # Hardcoded default values
+    defaults = {
+        "location": "Durham, NC",
+        "releaseDate": "2024-01-15",
+        "gender": "prefer_not_to_say",
+        "over18": True,
+        "language": "en"
+    }
+    
+    # Create a copy to avoid modifying the original
+    updated_info = user_info.copy()
+    
+    # Apply defaults for missing or empty fields
+    for key, default_value in defaults.items():
+        if key not in updated_info or updated_info[key] is None or updated_info[key] == "":
+            updated_info[key] = default_value
+            logger.debug(f"Applied default for {key}: {default_value}")
+    
+    return updated_info
+
+
 # Orchestrate the chat request processing
 def orchestrate(event):
     """
@@ -39,6 +70,10 @@ def orchestrate(event):
         body = json.loads(event["body"])
         chatHistory = body.get("messages", [])
         userInfo = body.get("userInfo", {})
+        
+        # Apply default values to userInfo
+        userInfo = apply_default_user_info(userInfo)
+        logger.info(f"User info after defaults: {userInfo}")
         
         # Get or generate conversation ID
         conversation_id = body.get("conversationId")

@@ -25,6 +25,7 @@ interface ProtectedRouteProps {
  * Features:
  * - Blocks unauthenticated users
  * - Shows loading state while checking authentication
+ * - Redirects regular users to onboarding on page refresh
  * - Preserves attempted location for post-login redirect (optional enhancement)
  * - Customizable redirect path and loading component
  * 
@@ -51,6 +52,11 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, userGroup } = useAuth();
   const location = useLocation();
+
+  // Check if user has completed onboarding in this session
+  const hasCompletedOnboarding = sessionStorage.getItem('onboardingCompleted') === 'true';
+  const isRegularUser = userGroup === 'Users';
+  const isNotOnboarding = location.pathname !== '/onboarding';
 
   // Show loading state while determining authentication status
   if (isLoading) {
@@ -102,6 +108,13 @@ export function ProtectedRoute({
 
   // User is authenticated and has a valid group - render protected content
   console.log(`ProtectedRoute: Access granted for ${userGroup} user`);
+  
+  // Redirect regular users to onboarding if they haven't completed it this session
+  if (isRegularUser && isNotOnboarding && !hasCompletedOnboarding) {
+    console.log('ProtectedRoute: Regular user has not completed onboarding, redirecting');
+    return <Navigate to="/onboarding" replace />;
+  }
+  
   return <>{children}</>;
 }
 

@@ -65,7 +65,7 @@
     "UserPoolAddOns": {
      "AdvancedSecurityMode": "ENFORCED"
     },
-    "UserPoolName": "our-journey-user-pool-450da34c",
+    "UserPoolName": "our-journey-user-pool-367317bb",
     "UsernameAttributes": [
      "email"
     ],
@@ -85,7 +85,7 @@
   "OurJourneyUserPoolOurJourneyCognitoDomainA567F322": {
    "Type": "AWS::Cognito::UserPoolDomain",
    "Properties": {
-    "Domain": "our-journey-app-450da34c",
+    "Domain": "our-journey-app-367317bb",
     "UserPoolId": {
      "Ref": "OurJourneyUserPoolE1EB8C0A"
     }
@@ -152,7 +152,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-post-confirmation-role-450da34c"
+    "RoleName": "our-journey-post-confirmation-role-367317bb"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/PostConfirmationLambdaRole/Resource"
@@ -201,7 +201,7 @@
       "DEFAULT_GROUP": "Users"
      }
     },
-    "FunctionName": "our-journey-post-confirmation-450da34c",
+    "FunctionName": "our-journey-post-confirmation-367317bb",
     "Handler": "post_confirmation_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -291,7 +291,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-admin-creator-role-450da34c"
+    "RoleName": "our-journey-admin-creator-role-367317bb"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AdminCreatorLambdaRole/Resource"
@@ -337,7 +337,7 @@
      "S3Key": "c5bfbe70e9a927367df2a07a707e5d8ee2bcc77cfc385f5e5e03d90788b4e53c.zip"
     },
     "Description": "Creates default admin user on stack creation",
-    "FunctionName": "our-journey-admin-creator-450da34c",
+    "FunctionName": "our-journey-admin-creator-367317bb",
     "Handler": "create_admin_user_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -580,7 +580,7 @@
      "http://localhost:5173",
      "https://example.com"
     ],
-    "ClientName": "our-journey-app-client-450da34c",
+    "ClientName": "our-journey-app-client-367317bb",
     "EnableTokenRevocation": true,
     "ExplicitAuthFlows": [
      "ALLOW_USER_PASSWORD_AUTH",
@@ -632,7 +632,7 @@
       }
      ]
     },
-    "BucketName": "our-journey-frontend-store-450da34c",
+    "BucketName": "our-journey-frontend-store-367317bb",
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
      "BlockPublicPolicy": true,
@@ -896,7 +896,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/6505a89a33117461d6f80be67daae4e69493cfc4c4befac826cc451a77892d26.zip\",\"Bucket\":\"",
+       "/420acfe3cc12764b6888b0c71c92fc9dfa0b90a07a30c9a978be2e580ceb9e6f.zip\",\"Bucket\":\"",
        {
         "Ref": "FrontendStoreBucketC891F5ED"
        },
@@ -947,7 +947,7 @@
           {
            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "/6505a89a33117461d6f80be67daae4e69493cfc4c4befac826cc451a77892d26.zip"
+          "/420acfe3cc12764b6888b0c71c92fc9dfa0b90a07a30c9a978be2e580ceb9e6f.zip"
          ]
         ]
        }
@@ -1102,7 +1102,7 @@
       ]
      }
     ],
-    "RoleName": "our-journey-amplify-lambda-role-450da34c"
+    "RoleName": "our-journey-amplify-lambda-role-367317bb"
    },
    "Metadata": {
     "aws:cdk:path": "OurJourneyFrontendStack/AmplifyDeploymentLambdaRole/Resource"
@@ -1207,7 +1207,7 @@
        "Ref": "FrontendStoreBucketC891F5ED"
       },
       "FRONTEND_FOLDER_NAME": "build/",
-      "AMPLIFY_APP_NAME": "OurJourneyApp-450da34c",
+      "AMPLIFY_APP_NAME": "OurJourneyApp-367317bb",
       "USER_POOL_ID": {
        "Ref": "OurJourneyUserPoolE1EB8C0A"
       },
@@ -1234,7 +1234,7 @@
       }
      }
     },
-    "FunctionName": "our-journey-amplify-deployment-450da34c",
+    "FunctionName": "our-journey-amplify-deployment-367317bb",
     "Handler": "lambda_function.lambda_handler",
     "Role": {
      "Fn::GetAtt": [

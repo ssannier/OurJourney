@@ -25,6 +25,7 @@ export const OnboardingFlow = () => {
       // Complete onboarding
       setUserInfo(formData as UserInfo);
       setOnboardingComplete(true);
+      sessionStorage.setItem('onboardingCompleted', 'true');
       navigate('/chat');
     }
   };
@@ -37,6 +38,7 @@ export const OnboardingFlow = () => {
       // Skip and complete onboarding
       setUserInfo(formData as UserInfo);
       setOnboardingComplete(true);
+      sessionStorage.setItem('onboardingCompleted', 'true');
       navigate('/chat');
     }
   };
