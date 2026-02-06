@@ -66,8 +66,10 @@ print_warning() {
 }
 
 prompt_admin_credentials() {
-    # Prompt user for admin email and password with validation.
-    # Sets ADMIN_EMAIL and ADMIN_PASSWORD global variables.
+    """
+    Prompt user for admin email and password with validation.
+    Sets ADMIN_EMAIL and ADMIN_PASSWORD global variables.
+    """
     print_header "Admin Credentials Setup"
     
     echo -e "${YELLOW}A default admin user will be created for your application.${NC}" >&2
@@ -236,67 +238,6 @@ run_preflight_checks() {
     print_substep "frontend_build.sh exists"
     
     print_step "All pre-flight checks passed"
-    echo "" >&2
-}
-
-################################################################################
-# Python Virtual Environment Setup
-################################################################################
-
-setup_python_venv() {
-    print_header "Setting up Python Virtual Environment"
-    
-    # Navigate to backend directory
-    cd "$BACKEND_DIR" || {
-        print_error "Failed to navigate to $BACKEND_DIR"
-        exit 1
-    }
-    
-    # Check if Python3 is installed
-    if ! command -v python3 &> /dev/null; then
-        print_error "python3 is not installed"
-        echo "Please install Python 3: https://www.python.org/downloads/" >&2
-        exit 1
-    fi
-    PYTHON_VERSION=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-    print_substep "Python3 installed ($PYTHON_VERSION)"
-    
-    # Create virtual environment if it doesn't exist
-    if [ ! -d ".venv" ]; then
-        print_substep "Creating Python virtual environment..."
-        python3 -m venv .venv || {
-            print_error "Failed to create virtual environment"
-            exit 1
-        }
-        print_substep "Virtual environment created"
-    else
-        print_substep "Virtual environment already exists"
-    fi
-    
-    # Activate virtual environment
-    print_substep "Activating virtual environment..."
-    source .venv/bin/activate || {
-        print_error "Failed to activate virtual environment"
-        exit 1
-    }
-    print_substep "Virtual environment activated"
-    
-    # Install Python dependencies
-    if [ -f "requirements.txt" ]; then
-        print_substep "Installing Python dependencies from requirements.txt..."
-        pip3 install -r requirements.txt >&2 || {
-            print_error "Failed to install Python dependencies"
-            exit 1
-        }
-        print_substep "Python dependencies installed"
-    else
-        print_warning "requirements.txt not found in $BACKEND_DIR"
-    fi
-    
-    # Return to original directory
-    cd - > /dev/null
-    
-    print_step "Python virtual environment setup complete"
     echo "" >&2
 }
 
@@ -637,9 +578,6 @@ main() {
             
             # Run pre-flight checks
             run_preflight_checks
-            
-            # Setup Python virtual environment
-            setup_python_venv
             
             # Prompt for admin credentials early
             prompt_admin_credentials

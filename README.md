@@ -186,7 +186,7 @@ Ensure you have access to the Nova Pro LLM model and Titan text embedding models
 
 5. Run the deployment script:
    ```bash
-   ./setup.sh
+   ./setup.sh deploy
    ```
 
 6. Enter your prefered admin email and password
