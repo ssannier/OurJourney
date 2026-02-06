@@ -165,35 +165,86 @@ await webSocketManager.sendMessageAndWaitForResponse(
 
 Ensure you have access to the Nova Pro LLM model and Titan text embedding models in your AWS account, and permissions to deploy resources.
 
+**Network Configuration**
+- Default VPC available in your AWS region
+- If default VPC doesn't exist, create using: [AWS VPC Documentation](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-default-vpc.html)
+
+### EC2 Instance Setup
+
+1. **Navigate to EC2 Console**
+   - Log into your AWS Console
+   - Search for "EC2" in the services search bar
+   - Click on "EC2" under Services
+
+2. **Launch Instance**
+   - Click "Launch Instance" button
+   - Configure instance settings:
+     - Name: "OurJourney-Deployment"
+     - AMI: Amazon Linux 2023
+     - Instance type: t2.micro (or larger)
+     - Use default VPC configuration
+   - Click "Launch Instance"
+   - Wait for instance to reach "running" state
+
+3. **Connect to Instance**
+   - Navigate to the Instances page
+   - Select your created instance
+   - Click "Connect"
+   - Use EC2 Instance Connect or SSH with username: `ec2-user`
+
+> **Note**: Save your instance details for future management operations. This instance will be needed for updates and stack deletion.
+
+### Install Required Packages
+
+Execute the following commands in your EC2 terminal:
+
+> **Note**: When password prompts appear, press Enter. Use Ctrl+Shift+V for terminal paste operations.
+
+1. **Install Git**
+   ```bash
+   sudo yum install -y git
+   ```
+
+2. **Verify Installation**
+   ```bash
+   git --version
+   ```
+
 ### Deployment Steps
 
-1. Go to the AWS account you want the system to be deployed in and in the top right create a new CloudShell terminal
-
-2. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/ASUCICREPO/OurJourney
    ```
 
-3. Navigate to the project directory:
+2. **Navigate to the project directory**:
    ```bash
    cd OurJourney
    ```
 
-4. Make the setup script executable:
+3. **Make the setup script executable**:
    ```bash
    chmod +x setup.sh
    ```
 
-5. Run the deployment script:
+4. **Run the deployment script**:
    ```bash
    ./setup.sh deploy
    ```
 
-6. Enter your prefered admin email and password
+5. **Enter your preferred admin email and password**
 
-7. Wait for the system to be deployed (may take up to 30 minutes)
+6. **Wait for the system to be deployed** (may take up to 30 minutes)
 
-8. View the application at the deployed amplify link, which can be found in the amplify console page
+7. **View the application** at the deployed Amplify link, which can be found in the Amplify console page
+
+8. **Stop the EC2 Instance**
+   - Exit the EC2 instance
+   - Navigate to EC2 console
+   - Select your instance
+   - Click "Instance state" → "Stop instance"
+
+> **Important**: Keep the EC2 instance for future deployment management, updates, and deletion operations. Do not terminate the instance.
 
 
 
@@ -239,3 +290,69 @@ Ensure you have access to the Nova Pro LLM model and Titan text embedding models
    - Click on recommended resources for more details
    - Contact information is provided for each resource
    - Our Journey resources are prioritized
+
+## Stack Management
+
+### How to Delete the Stack
+
+1. **Start EC2 Instance**
+   - Navigate to EC2 console in AWS
+   - Select the "OurJourney-Deployment" instance
+   - Click "Instance state" → "Start instance"
+   - Wait for instance to reach "running" state
+
+2. **Connect to Instance**
+   - Select your instance
+   - Click "Connect"
+   - Use EC2 Instance Connect
+
+3. **Navigate to Project Directory**
+   ```bash
+   cd OurJourney
+   ```
+
+4. **Run Destroy Script**
+   ```bash
+   ./setup.sh destroy
+   ```
+   - Confirm deletion when prompted
+   - Wait for stack deletion to complete
+
+5. **Manual Cleanup (if needed)**
+   - Navigate to AWS Bedrock console
+   - Delete the Knowledge Base if it wasn't automatically removed
+   - Navigate to Amplify console
+   - Delete the application if it wasn't automatically removed
+
+6. **Stop or Terminate EC2 Instance**
+   - Once deletion is complete, you can terminate the EC2 instance
+   - Navigate to EC2 console → Select instance → "Instance state" → "Terminate instance"
+
+> **Note**: The destroy process removes Lambda functions, API Gateway, S3 buckets, and related resources. Some resources like Knowledge Base may require manual deletion.
+
+### How to Update Resources
+
+1. **Start EC2 Instance**
+   - Restart the "OurJourney-Deployment" instance
+   - Connect using EC2 Instance Connect
+
+2. **Navigate to Project Directory**
+   ```bash
+   cd OurJourney
+   ```
+
+3. **Update Resource Files**
+   - Modify files in the data/resources directory as needed
+   - Ensure CSV format is maintained
+
+4. **Redeploy with Updates**
+   ```bash
+   ./setup.sh update
+   ```
+   - The Knowledge Base will automatically sync with new data
+   - Frontend will rebuild with any changes
+
+5. **Stop EC2 Instance**
+   - Exit and stop the instance when complete
+
+> **Important**: Always maintain the EC2 instance for future updates and management. Terminating it will require a new instance setup for future operations.
